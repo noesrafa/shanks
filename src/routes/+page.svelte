@@ -165,6 +165,57 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		}
 	}
 
+	// Step 5: chat
+	interface ChatMessage {
+		role: 'user' | 'assistant';
+		content: string;
+	}
+
+	let chatMode = $state<'report' | 'agent'>('report');
+	let chatAgent = $state('');
+	let chatInput = $state('');
+	let chatHistory: ChatMessage[] = $state([]);
+	let chatLoading = $state(false);
+
+	async function sendChat() {
+		if (!chatInput.trim() || chatLoading) return;
+		const msg = chatInput.trim();
+		chatInput = '';
+		chatHistory = [...chatHistory, { role: 'user', content: msg }];
+		chatLoading = true;
+
+		try {
+			const res = await fetch('/api/chat', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					projectId,
+					message: msg,
+					mode: chatMode,
+					agentName: chatMode === 'agent' ? chatAgent : undefined,
+					history: chatHistory.slice(0, -1),
+					report: chatMode === 'report' ? report : undefined
+				})
+			});
+			const data = await res.json();
+			if (data.error) {
+				chatHistory = [...chatHistory, { role: 'assistant', content: `Error: ${data.error}` }];
+			} else {
+				chatHistory = [...chatHistory, { role: 'assistant', content: data.reply }];
+			}
+		} catch {
+			chatHistory = [...chatHistory, { role: 'assistant', content: 'Failed to get response.' }];
+		} finally {
+			chatLoading = false;
+		}
+	}
+
+	function switchChatMode(mode: 'report' | 'agent', name?: string) {
+		chatMode = mode;
+		chatAgent = name || '';
+		chatHistory = [];
+	}
+
 	// For backward compat with sidebar stats
 	let agents = $derived(
 		generatedAgents.map((a) => ({
@@ -706,12 +757,80 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		</div>
 
 	{:else if currentStep === 5}
-		<!-- STEP 5: Chat (placeholder) -->
-		<div class="step-panel centered">
-			<div class="placeholder">
-				<h2>Deep Interaction</h2>
-				<p class="hint">Chat with the ReportAgent or interview individual agents about their decisions and reasoning.</p>
-				<p class="hint">Coming in Sprint 9.</p>
+		<!-- STEP 5: Deep Interaction -->
+		<div class="step-panel chat-layout">
+			<div class="chat-sidebar">
+				<h3>Talk to</h3>
+
+				<button
+					class="chat-target"
+					class:active={chatMode === 'report'}
+					onclick={() => switchChatMode('report')}
+				>
+					<span class="chat-target-name">ReportAgent</span>
+					<span class="chat-target-desc">Ask about predictions</span>
+				</button>
+
+				<h3>Interview agents</h3>
+				<div class="agent-list-chat">
+					{#each generatedAgents as a}
+						<button
+							class="chat-target"
+							class:active={chatMode === 'agent' && chatAgent === a.name}
+							onclick={() => switchChatMode('agent', a.name)}
+						>
+							<span class="chat-target-name">{a.name}</span>
+							<span class="chat-target-stance" class:supportive={a.stance === 'supportive'} class:opposing={a.stance === 'opposing'}>{a.stance}</span>
+						</button>
+					{/each}
+				</div>
+			</div>
+
+			<div class="chat-main">
+				<div class="chat-header">
+					{#if chatMode === 'report'}
+						Chatting with <strong>ReportAgent</strong>
+					{:else}
+						Interviewing <strong>{chatAgent}</strong>
+					{/if}
+				</div>
+
+				<div class="chat-messages">
+					{#if chatHistory.length === 0}
+						<div class="empty">
+							{#if chatMode === 'report'}
+								Ask the ReportAgent about its predictions, methodology, or specific agents.
+							{:else}
+								Ask {chatAgent} about their opinions, decisions, and reasoning during the simulation.
+							{/if}
+						</div>
+					{/if}
+
+					{#each chatHistory as msg}
+						<div class="chat-msg" class:user={msg.role === 'user'} class:assistant={msg.role === 'assistant'}>
+							<div class="chat-msg-label">{msg.role === 'user' ? 'You' : chatMode === 'report' ? 'ReportAgent' : chatAgent}</div>
+							<div class="chat-msg-content">{msg.content}</div>
+						</div>
+					{/each}
+
+					{#if chatLoading}
+						<div class="chat-msg assistant">
+							<div class="chat-msg-label">{chatMode === 'report' ? 'ReportAgent' : chatAgent}</div>
+							<div class="chat-msg-content typing">Thinking...</div>
+						</div>
+					{/if}
+				</div>
+
+				<div class="chat-input-row">
+					<input
+						type="text"
+						bind:value={chatInput}
+						placeholder={chatMode === 'report' ? 'Ask about the prediction...' : `Ask ${chatAgent} a question...`}
+						onkeydown={(e) => e.key === 'Enter' && sendChat()}
+						disabled={chatLoading}
+					/>
+					<button class="primary" onclick={sendChat} disabled={chatLoading || !chatInput.trim()}>Send</button>
+				</div>
 			</div>
 		</div>
 	{/if}
@@ -1518,6 +1637,164 @@ The National Labor Relations Board received a surge of complaints about retaliat
 
 	.markdown strong {
 		color: #ffffff;
+	}
+
+	/* --- Step 5: Chat layout --- */
+	.chat-layout {
+		display: flex;
+		gap: 0;
+		padding: 0;
+	}
+
+	.chat-sidebar {
+		width: 240px;
+		flex-shrink: 0;
+		padding: 16px;
+		border-right: 1px solid #2f3336;
+		overflow-y: auto;
+	}
+
+	.chat-sidebar h3 {
+		margin: 16px 0 8px;
+		font-size: 12px;
+		color: #71767b;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.chat-sidebar h3:first-child {
+		margin-top: 0;
+	}
+
+	.agent-list-chat {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.chat-target {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 8px 10px;
+		background: none;
+		border: none;
+		border-radius: 6px;
+		color: #e7e9ea;
+		font-size: 13px;
+		cursor: pointer;
+		text-align: left;
+	}
+
+	.chat-target:hover {
+		background: #16181c;
+	}
+
+	.chat-target.active {
+		background: #1d3a5c;
+	}
+
+	.chat-target-name {
+		flex: 1;
+		font-weight: 600;
+		font-size: 12px;
+	}
+
+	.chat-target-desc {
+		font-size: 11px;
+		color: #71767b;
+	}
+
+	.chat-target-stance {
+		font-size: 10px;
+		padding: 1px 6px;
+		border-radius: 8px;
+		background: #2f3336;
+		color: #71767b;
+	}
+
+	.chat-target-stance.supportive { background: #1a3a2a; color: #00ba7c; }
+	.chat-target-stance.opposing { background: #3d1f2e; color: #f91880; }
+
+	.chat-main {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.chat-header {
+		padding: 12px 20px;
+		border-bottom: 1px solid #2f3336;
+		font-size: 14px;
+	}
+
+	.chat-messages {
+		flex: 1;
+		overflow-y: auto;
+		padding: 20px;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+
+	.chat-msg {
+		max-width: 80%;
+	}
+
+	.chat-msg.user {
+		align-self: flex-end;
+	}
+
+	.chat-msg.assistant {
+		align-self: flex-start;
+	}
+
+	.chat-msg-label {
+		font-size: 11px;
+		color: #71767b;
+		margin-bottom: 4px;
+		font-weight: 600;
+	}
+
+	.chat-msg.user .chat-msg-label {
+		text-align: right;
+	}
+
+	.chat-msg-content {
+		padding: 10px 14px;
+		border-radius: 12px;
+		font-size: 14px;
+		line-height: 1.4;
+	}
+
+	.chat-msg.user .chat-msg-content {
+		background: #1d9bf0;
+		color: white;
+		border-bottom-right-radius: 4px;
+	}
+
+	.chat-msg.assistant .chat-msg-content {
+		background: #16181c;
+		border: 1px solid #2f3336;
+		border-bottom-left-radius: 4px;
+	}
+
+	.typing {
+		color: #71767b;
+		font-style: italic;
+	}
+
+	.chat-input-row {
+		display: flex;
+		gap: 8px;
+		padding: 12px 20px;
+		border-top: 1px solid #2f3336;
+	}
+
+	.chat-input-row input {
+		flex: 1;
 	}
 
 	/* --- Placeholder --- */
