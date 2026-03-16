@@ -1,4 +1,4 @@
-import { pgSchema, serial, text, timestamp, integer, unique, jsonb } from 'drizzle-orm/pg-core';
+import { pgSchema, serial, text, timestamp, integer, unique, jsonb, real } from 'drizzle-orm/pg-core';
 
 const shanksSchema = pgSchema('shanks');
 
@@ -104,5 +104,21 @@ export const graphEdges = shanksSchema.table('graph_edges', {
 		.notNull(),
 	edgeType: text('edge_type').notNull(),
 	fact: text('fact').notNull(),
+	createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+// MiroFish Stage 2: agents generated from graph entities
+export const agents = shanksSchema.table('agents', {
+	id: serial('id').primaryKey(),
+	projectId: integer('project_id')
+		.references(() => projects.id)
+		.notNull(),
+	userId: integer('user_id')
+		.references(() => users.id)
+		.notNull(),
+	nodeId: integer('node_id').references(() => graphNodes.id),
+	persona: text('persona').notNull(),
+	stance: text('stance').default('neutral').notNull(),
+	activityLevel: real('activity_level').default(0.5).notNull(),
 	createdAt: timestamp('created_at').defaultNow().notNull()
 });

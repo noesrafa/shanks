@@ -61,34 +61,53 @@
 	let graphEdges: GraphEdge[] = $state([]);
 	let ontology: any = $state(null);
 
-	// Step 2: agents (hardcoded for now, will be auto-generated in Sprint 6)
-	const agents: AgentCard[] = [
-		{
-			name: 'Maya Chen',
-			bio: 'AI researcher and coffee addict. Exploring the frontier of machine learning.',
-			interests: ['AI', 'deep learning', 'coffee', 'hiking']
-		},
-		{
-			name: 'Carlos Rivera',
-			bio: 'Street photographer capturing urban stories. Based in Mexico City.',
-			interests: ['photography', 'street art', 'travel', 'film']
-		},
-		{
-			name: 'Priya Sharma',
-			bio: 'Climate activist and environmental science student. Every action counts.',
-			interests: ['climate', 'sustainability', 'renewable energy', 'veganism']
-		},
-		{
-			name: 'Jordan Blake',
-			bio: 'Indie game developer and retro computing enthusiast.',
-			interests: ['game dev', 'pixel art', 'retro gaming', 'programming']
-		},
-		{
-			name: 'Amara Osei',
-			bio: 'Startup founder in fintech. Obsessed with financial inclusion across Africa.',
-			interests: ['fintech', 'startups', 'Africa', 'mobile payments']
+	// Step 2: agents (generated from graph)
+	interface GeneratedAgent {
+		id: number;
+		userId: number;
+		name: string;
+		entityType: string;
+		bio: string;
+		persona: string;
+		interests: string[] | string;
+		stance: string;
+		activityLevel: number;
+	}
+
+	let generatedAgents: GeneratedAgent[] = $state([]);
+	let agentsLoading = $state(false);
+	let agentsError = $state('');
+
+	// For backward compat with sidebar stats
+	let agents = $derived(
+		generatedAgents.map((a) => ({
+			name: a.name,
+			bio: a.bio,
+			interests: typeof a.interests === 'string' ? a.interests.split(',').map((s: string) => s.trim()) : a.interests
+		}))
+	);
+
+	async function generateAgents() {
+		agentsLoading = true;
+		agentsError = '';
+		try {
+			const res = await fetch('/api/agents', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ projectId })
+			});
+			const data = await res.json();
+			if (data.error) {
+				agentsError = data.error;
+			} else {
+				generatedAgents = data.agents;
+			}
+		} catch (e) {
+			agentsError = e instanceof Error ? e.message : 'Failed to generate agents';
+		} finally {
+			agentsLoading = false;
 		}
-	];
+	}
 
 	// Step 3: simulation
 	interface RoundSnapshot {
@@ -317,40 +336,67 @@
 		</div>
 
 	{:else if currentStep === 2}
-		<!-- STEP 2: Agents overview (like MiroFish environment setup) -->
+		<!-- STEP 2: Agents (generated from graph, like MiroFish environment setup) -->
 		<div class="step-panel">
 			<div class="agents-header">
 				<h2>Agents</h2>
 				<div class="agent-stats">
 					<div class="stat">
-						<span class="stat-num">{agents.length}</span>
+						<span class="stat-num">{generatedAgents.length}</span>
 						<span class="stat-label">Agents</span>
 					</div>
 					<div class="stat">
-						<span class="stat-num">4</span>
-						<span class="stat-label">Actions available</span>
+						<span class="stat-num">{graphNodes.length}</span>
+						<span class="stat-label">Entities</span>
+					</div>
+					<div class="stat">
+						<span class="stat-num">5</span>
+						<span class="stat-label">Actions</span>
 					</div>
 				</div>
 			</div>
 
-			<div class="agents-grid">
-				{#each agents as agent}
-					<div class="agent-card">
-						<div class="agent-name">{agent.name}</div>
-						<div class="agent-bio">{agent.bio}</div>
-						<div class="agent-tags">
-							{#each agent.interests as tag}
-								<span class="tag">{tag}</span>
-							{/each}
-						</div>
-					</div>
-				{/each}
-			</div>
+			{#if generatedAgents.length === 0}
+				{#if agentsError}
+					<div class="error">{agentsError}</div>
+				{/if}
 
-			<div class="step-actions">
-				<button class="secondary" onclick={() => (currentStep = 1)}>Back</button>
-				<button class="primary" onclick={() => (currentStep = 3)}>Next: Simulate</button>
-			</div>
+				{#if projectId === 0}
+					<div class="empty">Build a knowledge graph in Step 1 first.</div>
+				{:else}
+					<p class="hint">Generate agent personas from the {graphNodes.length} entities extracted in Step 1. Each entity becomes an agent with personality, stance, and behavior.</p>
+					<button class="primary" onclick={generateAgents} disabled={agentsLoading}>
+						{agentsLoading ? 'Generating personas...' : `Generate ${graphNodes.length} Agents`}
+					</button>
+				{/if}
+			{:else}
+				<div class="agents-grid">
+					{#each generatedAgents as agent}
+						<div class="agent-card">
+							<div class="agent-head-row">
+								<div class="agent-name">{agent.name}</div>
+								<span class="entity-type">{agent.entityType}</span>
+								<span class="stance-chip" class:supportive={agent.stance === 'supportive'} class:opposing={agent.stance === 'opposing'} class:observer={agent.stance === 'observer'}>{agent.stance}</span>
+							</div>
+							<div class="agent-bio">{agent.bio}</div>
+							<div class="agent-persona">{agent.persona}</div>
+							<div class="agent-meta">
+								<span>Activity: {Math.round(agent.activityLevel * 100)}%</span>
+							</div>
+							<div class="agent-tags">
+								{#each (typeof agent.interests === 'string' ? agent.interests.split(',') : agent.interests) as tag}
+									<span class="tag">{tag.trim()}</span>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				</div>
+
+				<div class="step-actions">
+					<button class="secondary" onclick={() => (currentStep = 1)}>Back</button>
+					<button class="primary" onclick={() => (currentStep = 3)}>Next: Simulate</button>
+				</div>
+			{/if}
 		</div>
 
 	{:else if currentStep === 3}
@@ -836,17 +882,62 @@
 		padding: 16px;
 	}
 
+	.agent-head-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 6px;
+		flex-wrap: wrap;
+	}
+
 	.agent-name {
 		font-weight: 700;
 		font-size: 15px;
-		margin-bottom: 4px;
 	}
 
 	.agent-bio {
 		color: #71767b;
 		font-size: 13px;
-		margin-bottom: 10px;
+		margin-bottom: 6px;
 		line-height: 1.3;
+	}
+
+	.agent-persona {
+		color: #a0a4a8;
+		font-size: 12px;
+		line-height: 1.4;
+		margin-bottom: 8px;
+		border-left: 2px solid #2f3336;
+		padding-left: 10px;
+	}
+
+	.agent-meta {
+		font-size: 11px;
+		color: #71767b;
+		margin-bottom: 8px;
+	}
+
+	.stance-chip {
+		padding: 1px 8px;
+		border-radius: 10px;
+		font-size: 11px;
+		background: #2f3336;
+		color: #71767b;
+	}
+
+	.stance-chip.supportive {
+		background: #1a3a2a;
+		color: #00ba7c;
+	}
+
+	.stance-chip.opposing {
+		background: #3d1f2e;
+		color: #f91880;
+	}
+
+	.stance-chip.observer {
+		background: #1d3a5c;
+		color: #1d9bf0;
 	}
 
 	.agent-tags {
