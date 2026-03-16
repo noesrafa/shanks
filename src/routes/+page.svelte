@@ -136,6 +136,35 @@ The National Labor Relations Board received a surge of complaints about retaliat
 	let agentsLoading = $state(false);
 	let agentsError = $state('');
 
+	// Step 4: report
+	let report = $state('');
+	let reportStats: any = $state(null);
+	let reportLoading = $state(false);
+	let reportError = $state('');
+
+	async function generateReport() {
+		reportLoading = true;
+		reportError = '';
+		try {
+			const res = await fetch('/api/report', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ projectId })
+			});
+			const data = await res.json();
+			if (data.error) {
+				reportError = data.error;
+			} else {
+				report = data.report;
+				reportStats = data.stats;
+			}
+		} catch (e) {
+			reportError = e instanceof Error ? e.message : 'Failed to generate report';
+		} finally {
+			reportLoading = false;
+		}
+	}
+
 	// For backward compat with sidebar stats
 	let agents = $derived(
 		generatedAgents.map((a) => ({
@@ -598,12 +627,81 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		</div>
 
 	{:else if currentStep === 4}
-		<!-- STEP 4: Report (placeholder) -->
-		<div class="step-panel centered">
-			<div class="placeholder">
-				<h2>Prediction Report</h2>
-				<p class="hint">After running the simulation, the ReportAgent will analyze agent behavior and generate a prediction report with cited agent statements.</p>
-				<p class="hint">Coming in Sprint 8.</p>
+		<!-- STEP 4: Prediction Report -->
+		<div class="step-panel report-layout">
+			<div class="report-sidebar">
+				<h3>Report</h3>
+
+				{#if projectId === 0}
+					<div class="empty">Run the full pipeline first (Steps 1-3).</div>
+				{:else if !report}
+					<p class="hint">Analyze the simulation results and generate a prediction report.</p>
+
+					{#if reportError}
+						<div class="error">{reportError}</div>
+					{/if}
+
+					<button class="primary full-width" onclick={generateReport} disabled={reportLoading}>
+						{reportLoading ? 'Analyzing...' : 'Generate Prediction Report'}
+					</button>
+				{:else}
+					<h3>Stats</h3>
+					{#if reportStats}
+						<div class="sim-stats">
+							<div class="stat-row"><span>Agents</span><strong>{reportStats.agents}</strong></div>
+							<div class="stat-row"><span>Posts</span><strong>{reportStats.posts}</strong></div>
+							<div class="stat-row"><span>Comments</span><strong>{reportStats.comments}</strong></div>
+							<div class="stat-row"><span>Follows</span><strong>{reportStats.follows}</strong></div>
+						</div>
+
+						{#if reportStats.stances}
+							<h3>Stance distribution</h3>
+							<div class="stance-bars">
+								{#each Object.entries(reportStats.stances) as [stance, count]}
+									<div class="stance-row">
+										<span class="stance-label">{stance}</span>
+										<div class="stance-bar">
+											<div
+												class="stance-fill"
+												class:supportive={stance === 'supportive'}
+												class:opposing={stance === 'opposing'}
+												class:neutral={stance === 'neutral'}
+												class:observer={stance === 'observer'}
+												style="width: {((count as number) / reportStats.agents) * 100}%"
+											></div>
+										</div>
+										<span class="stance-count">{count}</span>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					{/if}
+
+					<div class="step-actions">
+						<button class="secondary" onclick={() => { report = ''; }} >Regenerate</button>
+						<button class="primary" onclick={() => (currentStep = 5)}>Next: Chat</button>
+					</div>
+				{/if}
+			</div>
+
+			<div class="report-content">
+				{#if reportLoading}
+					<div class="empty">Analyzing {reportStats?.posts || '...'} posts, {reportStats?.comments || '...'} comments, and {reportStats?.agents || '...'} agent behaviors...</div>
+				{:else if report}
+					<article class="markdown">
+						{@html report
+							.replace(/^## (.*$)/gm, '<h2>$1</h2>')
+							.replace(/^### (.*$)/gm, '<h3>$1</h3>')
+							.replace(/^> (.*$)/gm, '<blockquote>$1</blockquote>')
+							.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+							.replace(/\*(.*?)\*/g, '<em>$1</em>')
+							.replace(/\n\n/g, '</p><p>')
+							.replace(/^/, '<p>')
+							.replace(/$/, '</p>')}
+					</article>
+				{:else}
+					<div class="empty">Generate a report to see the prediction analysis here.</div>
+				{/if}
 			</div>
 		</div>
 
@@ -1304,6 +1402,122 @@ The National Labor Relations Board received a surge of complaints about retaliat
 
 	.comment span {
 		color: #d6d9db;
+	}
+
+	/* --- Step 4: Report layout --- */
+	.report-layout {
+		display: flex;
+		gap: 0;
+		padding: 0;
+	}
+
+	.report-sidebar {
+		width: 280px;
+		flex-shrink: 0;
+		padding: 20px;
+		border-right: 1px solid #2f3336;
+		overflow-y: auto;
+	}
+
+	.report-sidebar h3 {
+		margin: 16px 0 10px;
+		font-size: 14px;
+		color: #71767b;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.report-sidebar h3:first-child {
+		margin-top: 0;
+	}
+
+	.stance-bars {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.stance-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 12px;
+	}
+
+	.stance-label {
+		width: 70px;
+		color: #71767b;
+	}
+
+	.stance-bar {
+		flex: 1;
+		height: 8px;
+		background: #2f3336;
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.stance-fill {
+		height: 100%;
+		border-radius: 4px;
+		transition: width 0.3s;
+	}
+
+	.stance-fill.supportive { background: #00ba7c; }
+	.stance-fill.opposing { background: #f91880; }
+	.stance-fill.neutral { background: #71767b; }
+	.stance-fill.observer { background: #1d9bf0; }
+
+	.stance-count {
+		width: 20px;
+		text-align: right;
+		color: #e7e9ea;
+		font-weight: 600;
+	}
+
+	.report-content {
+		flex: 1;
+		overflow-y: auto;
+		padding: 32px 40px;
+	}
+
+	.markdown {
+		line-height: 1.7;
+		font-size: 15px;
+	}
+
+	.markdown h2 {
+		font-size: 20px;
+		margin: 32px 0 12px;
+		padding-bottom: 8px;
+		border-bottom: 1px solid #2f3336;
+	}
+
+	.markdown h2:first-child {
+		margin-top: 0;
+	}
+
+	.markdown h3 {
+		font-size: 16px;
+		margin: 24px 0 8px;
+	}
+
+	.markdown p {
+		margin: 0 0 16px;
+	}
+
+	.markdown blockquote {
+		border-left: 3px solid #1d9bf0;
+		padding: 8px 16px;
+		margin: 12px 0;
+		background: #16181c;
+		border-radius: 0 8px 8px 0;
+		color: #d6d9db;
+		font-style: italic;
+	}
+
+	.markdown strong {
+		color: #ffffff;
 	}
 
 	/* --- Placeholder --- */
