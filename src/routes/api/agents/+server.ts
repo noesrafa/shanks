@@ -8,16 +8,6 @@ import { eq } from 'drizzle-orm';
 /**
  * Agent generation API.
  * Adapted from MiroFish Stage 2: OasisProfileGenerator.
- *
- * MiroFish pattern:
- *   1. Read entities from knowledge graph
- *   2. For each entity, do hybrid search for context (related edges + nodes)
- *   3. Classify as individual vs group, use different prompts
- *   4. LLM generates: bio (200 chars), persona (2000 chars), stance, activity_level
- *   5. Store as agent + user record
- *
- * POST: Generate agents from project graph
- * GET: Fetch agents for a project
  */
 
 const MINIMAX_BASE_URL = 'https://api.minimax.io/v1';
@@ -35,131 +25,113 @@ async function generateAgentProfile(
 	context: string,
 	requirement: string
 ): Promise<GeneratedProfile> {
-	// MiroFish classifies entities as individual vs group
 	const individualTypes = ['Person', 'Politician', 'Executive', 'Journalist', 'Activist'];
 	const isIndividual = individualTypes.some(
 		(t) => entity.entityType.toLowerCase().includes(t.toLowerCase())
 	);
 
 	const system = isIndividual
-		? `You are a social media persona generator for simulation. Generate a detailed, realistic persona for an INDIVIDUAL who will participate in a social media simulation about this topic.
-
-The persona should feel like a real person with opinions, personality quirks, and a distinct voice.`
-		: `You are a social media persona generator for simulation. Generate a persona for an OFFICIAL ACCOUNT REPRESENTATIVE of an organization/institution who manages their social media presence.
-
-The persona should reflect the organization's public stance and communication style.`;
+		? `You are a social media persona generator. Generate a realistic persona for an INDIVIDUAL participating in a social simulation. Return ONLY valid JSON, no other text.`
+		: `You are a social media persona generator. Generate a persona for an OFFICIAL ACCOUNT REPRESENTATIVE of an organization. Return ONLY valid JSON, no other text.`;
 
 	const user = `Entity: ${entity.name} (${entity.entityType})
 Summary: ${entity.summary}
-
-Context from knowledge graph:
-${context}
-
+Context: ${context}
 Simulation question: ${requirement}
 
-Generate a social media profile. Return ONLY valid JSON:
-{
-  "bio": "200 char max social media bio",
-  "persona": "Detailed personality description (500-1000 chars). Include: background, communication style, likely stance on the topic, what they post about, how they interact with others. Be specific and opinionated.",
-  "interests": "comma-separated interest tags relevant to this entity",
-  "stance": "supportive|opposing|neutral|observer (regarding the simulation question)",
-  "activity_level": 0.7
-}
+Return this exact JSON structure:
+{"bio": "200 char bio", "persona": "500-1000 char personality", "interests": "tag1, tag2, tag3", "stance": "supportive", "activity_level": 0.5}
 
-activity_level: 0.0 (rarely posts) to 1.0 (very active). Officials and organizations are typically 0.3-0.5, activists and journalists 0.7-0.9.`;
+stance must be one of: supportive, opposing, neutral, observer
+activity_level: 0.0 to 1.0`;
 
-	const response = await fetch(`${MINIMAX_BASE_URL}/chat/completions`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${MINIMAX_API_KEY}`
-		},
-		body: JSON.stringify({
-			model: 'MiniMax-M2.5',
-			messages: [
-				{ role: 'system', content: system },
-				{ role: 'user', content: user }
-			],
-			temperature: 0.7,
-			max_tokens: 1024
-		})
-	});
+	for (let attempt = 0; attempt < 2; attempt++) {
+		try {
+			const response = await fetch(`${MINIMAX_BASE_URL}/chat/completions`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${MINIMAX_API_KEY}`
+				},
+				body: JSON.stringify({
+					model: 'MiniMax-M2.5',
+					messages: [
+						{ role: 'system', content: system },
+						{ role: 'user', content: user }
+					],
+					temperature: 0.5 - attempt * 0.2,
+					max_tokens: 1024
+				})
+			});
 
-	if (!response.ok) throw new Error(`LLM error: ${response.status}`);
+			if (!response.ok) continue;
 
-	const data = await response.json();
-	const raw = (data.choices[0].message.content || '')
-		.replace(/<think>[\s\S]*?<\/think>/g, '')
-		.trim();
+			const data = await response.json();
+			const raw = (data.choices[0].message.content || '')
+				.replace(/<think>[\s\S]*?<\/think>/g, '')
+				.trim();
 
-	const match = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-	const jsonStr = match ? match[1].trim() : raw;
-	return JSON.parse(jsonStr);
+			const match = raw.match(/```(?:json)?\s*([\s\S]*?)```/) || raw.match(/(\{[\s\S]*\})/);
+			if (match) {
+				return JSON.parse(match[1].trim());
+			}
+		} catch {
+			continue;
+		}
+	}
+
+	// Fallback
+	return {
+		bio: entity.summary.slice(0, 200),
+		persona: `${entity.name} is a ${entity.entityType} involved in this topic. They engage in public discourse based on their institutional role.`,
+		interests: entity.entityType.toLowerCase(),
+		stance: 'neutral',
+		activity_level: 0.5
+	};
 }
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const { projectId } = await request.json();
-		if (!projectId) {
-			return json({ error: 'projectId is required' }, { status: 400 });
-		}
+		if (!projectId) return json({ error: 'projectId is required' }, { status: 400 });
 
 		const project = await db.query.projects.findFirst({
 			where: (p, { eq }) => eq(p.id, projectId)
 		});
-		if (!project) {
-			return json({ error: 'Project not found' }, { status: 404 });
-		}
+		if (!project) return json({ error: 'Project not found' }, { status: 404 });
 
-		// Get all entities from the graph
-		const nodes = await db
-			.select()
-			.from(graphNodes)
-			.where(eq(graphNodes.projectId, projectId));
+		const nodes = await db.select().from(graphNodes).where(eq(graphNodes.projectId, projectId));
+		const edges = await db.select().from(graphEdges).where(eq(graphEdges.projectId, projectId));
 
-		// Get all edges for context
-		const edges = await db
-			.select()
-			.from(graphEdges)
-			.where(eq(graphEdges.projectId, projectId));
-
-		// Generate agent for each entity (parallel, batched to avoid rate limits)
 		const generatedAgents = [];
 		const batchSize = 5;
 
 		for (let i = 0; i < nodes.length; i += batchSize) {
 			const batch = nodes.slice(i, i + batchSize);
-			const results = await Promise.all(
+			const results = await Promise.allSettled(
 				batch.map(async (node) => {
-					// Build context from related edges (like MiroFish hybrid search)
 					const relatedEdges = edges.filter(
 						(e) => e.sourceNodeId === node.id || e.targetNodeId === node.id
 					);
 					const context = relatedEdges
 						.map((e) => {
-							const source = nodes.find((n) => n.id === e.sourceNodeId);
-							const target = nodes.find((n) => n.id === e.targetNodeId);
-							return `${source?.name} --[${e.edgeType}]--> ${target?.name}: ${e.fact}`;
+							const src = nodes.find((n) => n.id === e.sourceNodeId);
+							const tgt = nodes.find((n) => n.id === e.targetNodeId);
+							return `${src?.name} --[${e.edgeType}]--> ${tgt?.name}: ${e.fact}`;
 						})
 						.join('\n');
 
 					const profile = await generateAgentProfile(
 						{ name: node.name, entityType: node.entityType, summary: node.summary },
-						context || 'No additional context available.',
+						context || 'No additional context.',
 						project.requirement
 					);
 
-					// Create user record
 					const [user] = await db
 						.insert(users)
-						.values({
-							name: node.name,
-							bio: profile.bio,
-							interests: profile.interests
-						})
+						.values({ name: node.name, bio: profile.bio, interests: profile.interests })
 						.returning();
 
-					// Create agent record
 					const [agent] = await db
 						.insert(agents)
 						.values({
@@ -179,13 +151,19 @@ export const POST: RequestHandler = async ({ request }) => {
 						entityType: node.entityType,
 						bio: profile.bio,
 						persona: profile.persona,
-						interests: profile.interests.split(',').map((s: string) => s.trim()),
+						interests:
+							typeof profile.interests === 'string'
+								? profile.interests.split(',').map((s: string) => s.trim())
+								: [node.entityType.toLowerCase()],
 						stance: profile.stance,
 						activityLevel: profile.activity_level
 					};
 				})
 			);
-			generatedAgents.push(...results);
+
+			for (const r of results) {
+				if (r.status === 'fulfilled') generatedAgents.push(r.value);
+			}
 		}
 
 		return json({ agents: generatedAgents });
@@ -197,9 +175,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 export const GET: RequestHandler = async ({ url }) => {
 	const projectId = parseInt(url.searchParams.get('projectId') || '0');
-	if (!projectId) {
-		return json({ error: 'projectId required' }, { status: 400 });
-	}
+	if (!projectId) return json({ error: 'projectId required' }, { status: 400 });
 
 	const projectAgents = await db
 		.select({
