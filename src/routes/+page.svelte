@@ -32,10 +32,34 @@
 		interests: string[];
 	}
 
+	interface GraphNode {
+		id: number;
+		name: string;
+		entityType: string;
+		summary: string;
+		attributes: Record<string, string>;
+	}
+
+	interface GraphEdge {
+		id: number;
+		sourceNodeId: number;
+		targetNodeId: number;
+		edgeType: string;
+		fact: string;
+	}
+
 	// --- State ---
 	let currentStep = $state(1);
 	let seedText = $state('');
 	let requirement = $state('');
+
+	// Step 1: graph
+	let graphLoading = $state(false);
+	let graphError = $state('');
+	let projectId = $state(0);
+	let graphNodes: GraphNode[] = $state([]);
+	let graphEdges: GraphEdge[] = $state([]);
+	let ontology: any = $state(null);
 
 	// Step 2: agents (hardcoded for now, will be auto-generated in Sprint 6)
 	const agents: AgentCard[] = [
@@ -89,6 +113,35 @@
 	let displayActions = $derived(displaySnapshot?.actions ?? []);
 	let displayRound = $derived(displaySnapshot?.round ?? 0);
 	let isLive = $derived(viewingRound === 0 || viewingRound === totalRounds);
+
+	async function buildGraph() {
+		graphLoading = true;
+		graphError = '';
+		try {
+			const res = await fetch('/api/graph', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name: 'Project', seedText, requirement })
+			});
+			const data = await res.json();
+			if (data.error) {
+				graphError = data.error;
+				return;
+			}
+			projectId = data.projectId;
+			ontology = data.ontology;
+
+			// Fetch full graph
+			const graphRes = await fetch(`/api/graph?projectId=${projectId}`);
+			const graphData = await graphRes.json();
+			graphNodes = graphData.nodes;
+			graphEdges = graphData.edges;
+		} catch (e) {
+			graphError = e instanceof Error ? e.message : 'Failed to build graph';
+		} finally {
+			graphLoading = false;
+		}
+	}
 
 	const steps = [
 		{ num: 1, label: 'Seed' },
@@ -161,18 +214,18 @@
 <!-- Main content -->
 <main class="content">
 	{#if currentStep === 1}
-		<!-- STEP 1: Seed material input -->
-		<div class="step-panel centered">
-			<div class="seed-form">
+		<!-- STEP 1: Seed material + Knowledge Graph -->
+		<div class="step-panel graph-layout">
+			<div class="seed-side">
 				<h2>Seed Material</h2>
-				<p class="hint">Paste your source material (news article, policy document, market data, etc.) and describe what you want to predict.</p>
+				<p class="hint">Paste source material and describe what you want to predict.</p>
 
 				<label>
 					Source text
 					<textarea
 						bind:value={seedText}
-						placeholder="Paste the article, document, or data you want to analyze..."
-						rows="10"
+						placeholder="Paste the article, document, or data..."
+						rows="8"
 					></textarea>
 				</label>
 
@@ -185,9 +238,81 @@
 					/>
 				</label>
 
-				<button class="primary" onclick={() => (currentStep = 2)}>
-					Next: Generate Agents
+				{#if graphError}
+					<div class="error">{graphError}</div>
+				{/if}
+
+				<button class="primary full-width" onclick={buildGraph} disabled={graphLoading || !seedText || !requirement}>
+					{graphLoading ? 'Extracting...' : 'Build Knowledge Graph'}
 				</button>
+
+				{#if graphNodes.length > 0}
+					<div class="step-actions">
+						<button class="primary" onclick={() => (currentStep = 2)}>
+							Next: Generate Agents
+						</button>
+					</div>
+				{/if}
+			</div>
+
+			<div class="graph-side">
+				{#if graphNodes.length === 0 && !graphLoading}
+					<div class="empty">Knowledge graph will appear here after extraction.</div>
+				{:else if graphLoading}
+					<div class="empty">Extracting entities and relationships...</div>
+				{:else}
+					<div class="graph-stats">
+						<div class="stat">
+							<span class="stat-num">{graphNodes.length}</span>
+							<span class="stat-label">Entities</span>
+						</div>
+						<div class="stat">
+							<span class="stat-num">{graphEdges.length}</span>
+							<span class="stat-label">Relationships</span>
+						</div>
+						<div class="stat">
+							<span class="stat-num">{ontology?.entities?.length || 0}</span>
+							<span class="stat-label">Entity types</span>
+						</div>
+					</div>
+
+					{#if ontology}
+						<h3>Entity Types</h3>
+						<div class="type-chips">
+							{#each ontology.entities as etype}
+								<span class="type-chip" title={etype.description}>{etype.type}</span>
+							{/each}
+						</div>
+					{/if}
+
+					<h3>Entities</h3>
+					<div class="entity-list">
+						{#each graphNodes as node}
+							<div class="entity-item">
+								<div class="entity-head">
+									<strong>{node.name}</strong>
+									<span class="entity-type">{node.entityType}</span>
+								</div>
+								<div class="entity-summary">{node.summary}</div>
+							</div>
+						{/each}
+					</div>
+
+					{#if graphEdges.length > 0}
+						<h3>Relationships</h3>
+						<div class="edge-list">
+							{#each graphEdges as edge}
+								{@const source = graphNodes.find((n) => n.id === edge.sourceNodeId)}
+								{@const target = graphNodes.find((n) => n.id === edge.targetNodeId)}
+								<div class="edge-item">
+									<span class="edge-node">{source?.name ?? '?'}</span>
+									<span class="edge-rel">{edge.edgeType}</span>
+									<span class="edge-node">{target?.name ?? '?'}</span>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				{/if}
 			</div>
 		</div>
 
@@ -460,15 +585,127 @@
 		padding-top: 60px;
 	}
 
-	/* --- Step 1: Seed --- */
-	.seed-form {
-		width: 100%;
-		max-width: 640px;
+	/* --- Step 1: Graph layout --- */
+	.graph-layout {
+		display: flex;
+		gap: 0;
+		padding: 0;
 	}
 
-	.seed-form h2 {
+	.seed-side {
+		width: 380px;
+		flex-shrink: 0;
+		padding: 24px;
+		border-right: 1px solid #2f3336;
+		overflow-y: auto;
+	}
+
+	.seed-side h2 {
 		margin: 0 0 8px;
 		font-size: 20px;
+	}
+
+	.graph-side {
+		flex: 1;
+		padding: 24px;
+		overflow-y: auto;
+	}
+
+	.graph-side h3 {
+		margin: 20px 0 10px;
+		font-size: 14px;
+		color: #71767b;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.graph-stats {
+		display: flex;
+		gap: 32px;
+		padding-bottom: 16px;
+		border-bottom: 1px solid #2f3336;
+	}
+
+	.type-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+
+	.type-chip {
+		background: #2a1a3a;
+		color: #a970ff;
+		padding: 4px 12px;
+		border-radius: 12px;
+		font-size: 12px;
+		cursor: help;
+	}
+
+	.entity-list {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.entity-item {
+		background: #16181c;
+		border: 1px solid #2f3336;
+		border-radius: 8px;
+		padding: 12px;
+	}
+
+	.entity-head {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 4px;
+	}
+
+	.entity-head strong {
+		font-size: 14px;
+	}
+
+	.entity-type {
+		background: #1d3a5c;
+		color: #1d9bf0;
+		padding: 1px 8px;
+		border-radius: 10px;
+		font-size: 11px;
+	}
+
+	.entity-summary {
+		color: #71767b;
+		font-size: 13px;
+		line-height: 1.3;
+	}
+
+	.edge-list {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.edge-item {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 12px;
+		background: #16181c;
+		border-radius: 6px;
+		font-size: 13px;
+	}
+
+	.edge-node {
+		color: #e7e9ea;
+		font-weight: 600;
+	}
+
+	.edge-rel {
+		color: #00ba7c;
+		font-size: 12px;
+		background: #1a3a2a;
+		padding: 2px 8px;
+		border-radius: 10px;
 	}
 
 	.hint {

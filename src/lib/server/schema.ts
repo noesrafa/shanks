@@ -1,4 +1,4 @@
-import { pgSchema, serial, text, timestamp, integer, unique } from 'drizzle-orm/pg-core';
+import { pgSchema, serial, text, timestamp, integer, unique, jsonb } from 'drizzle-orm/pg-core';
 
 const shanksSchema = pgSchema('shanks');
 
@@ -65,3 +65,44 @@ export const follows = shanksSchema.table(
 	},
 	(t) => [unique().on(t.followerId, t.followeeId)]
 );
+
+// MiroFish Stage 1: projects with seed material
+export const projects = shanksSchema.table('projects', {
+	id: serial('id').primaryKey(),
+	name: text('name').notNull(),
+	seedText: text('seed_text').notNull(),
+	requirement: text('requirement').notNull(),
+	ontology: jsonb('ontology'),
+	status: text('status').default('created').notNull(),
+	createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+// MiroFish Stage 1: knowledge graph nodes (entities)
+export const graphNodes = shanksSchema.table('graph_nodes', {
+	id: serial('id').primaryKey(),
+	projectId: integer('project_id')
+		.references(() => projects.id)
+		.notNull(),
+	name: text('name').notNull(),
+	entityType: text('entity_type').notNull(),
+	summary: text('summary').notNull(),
+	attributes: jsonb('attributes').default({}).notNull(),
+	createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+// MiroFish Stage 1: knowledge graph edges (relationships)
+export const graphEdges = shanksSchema.table('graph_edges', {
+	id: serial('id').primaryKey(),
+	projectId: integer('project_id')
+		.references(() => projects.id)
+		.notNull(),
+	sourceNodeId: integer('source_node_id')
+		.references(() => graphNodes.id)
+		.notNull(),
+	targetNodeId: integer('target_node_id')
+		.references(() => graphNodes.id)
+		.notNull(),
+	edgeType: text('edge_type').notNull(),
+	fact: text('fact').notNull(),
+	createdAt: timestamp('created_at').defaultNow().notNull()
+});
