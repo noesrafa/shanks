@@ -67,11 +67,28 @@
 	];
 
 	// Step 3: simulation
-	let posts: Post[] = $state([]);
-	let lastActions: ActionResult[] = $state([]);
-	let round = $state(0);
+	interface RoundSnapshot {
+		round: number;
+		actions: ActionResult[];
+		posts: Post[];
+	}
+
+	let snapshots: RoundSnapshot[] = $state([]);
+	let viewingRound = $state(0); // 0 = latest/live
+	let totalRounds = $state(0);
 	let loading = $state(false);
 	let error = $state('');
+
+	// Derived: which snapshot to display
+	let displaySnapshot = $derived(
+		viewingRound === 0 || snapshots.length === 0
+			? snapshots[snapshots.length - 1]
+			: snapshots[viewingRound - 1]
+	);
+	let displayPosts = $derived(displaySnapshot?.posts ?? []);
+	let displayActions = $derived(displaySnapshot?.actions ?? []);
+	let displayRound = $derived(displaySnapshot?.round ?? 0);
+	let isLive = $derived(viewingRound === 0 || viewingRound === totalRounds);
 
 	const steps = [
 		{ num: 1, label: 'Seed' },
@@ -90,15 +107,27 @@
 			if (data.error) {
 				error = data.error;
 			} else {
-				posts = data.posts;
-				lastActions = data.actions;
-				round++;
+				totalRounds++;
+				snapshots = [
+					...snapshots,
+					{
+						round: totalRounds,
+						actions: data.actions,
+						posts: data.posts
+					}
+				];
+				viewingRound = 0; // jump to live
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to connect';
 		} finally {
 			loading = false;
 		}
+	}
+
+	function onSliderChange(e: Event) {
+		const val = parseInt((e.target as HTMLInputElement).value);
+		viewingRound = val;
 	}
 
 	function actionLabel(a: ActionResult): string {
@@ -199,22 +228,22 @@
 		</div>
 
 	{:else if currentStep === 3}
-		<!-- STEP 3: Simulation (existing feed) -->
+		<!-- STEP 3: Simulation with timeline -->
 		<div class="step-panel sim-layout">
 			<div class="sim-sidebar">
 				<h3>Controls</h3>
 				<button class="primary full-width" onclick={simulate} disabled={loading}>
-					{loading ? 'Running...' : `Run round ${round + 1}`}
+					{loading ? 'Running...' : `Run round ${totalRounds + 1}`}
 				</button>
 
 				<div class="sim-stats">
 					<div class="stat-row">
 						<span>Rounds</span>
-						<strong>{round}</strong>
+						<strong>{totalRounds}</strong>
 					</div>
 					<div class="stat-row">
 						<span>Posts</span>
-						<strong>{posts.length}</strong>
+						<strong>{displayPosts.length}</strong>
 					</div>
 					<div class="stat-row">
 						<span>Agents</span>
@@ -222,13 +251,63 @@
 					</div>
 				</div>
 
-				{#if lastActions.length > 0}
-					<h3>Round {round} log</h3>
+				{#if totalRounds > 0}
+					<h3>Timeline</h3>
+					<div class="timeline">
+						<input
+							type="range"
+							min="1"
+							max={totalRounds}
+							value={viewingRound === 0 ? totalRounds : viewingRound}
+							oninput={onSliderChange}
+							class="slider"
+						/>
+						<div class="timeline-labels">
+							<span>Round 1</span>
+							<span class="timeline-current">
+								{#if isLive}
+									Round {totalRounds} (live)
+								{:else}
+									Round {viewingRound}
+								{/if}
+							</span>
+							<span>Round {totalRounds}</span>
+						</div>
+						{#if !isLive}
+							<button class="live-btn" onclick={() => (viewingRound = 0)}>
+								Jump to live
+							</button>
+						{/if}
+					</div>
+				{/if}
+
+				{#if displayActions.length > 0}
+					<h3>Round {displayRound} log</h3>
 					<div class="action-list">
-						{#each lastActions as a}
+						{#each displayActions as a}
 							<div class="action-item" class:like={a.action === 'like_post'} class:post={a.action === 'create_post'} class:comment={a.action === 'create_comment'} class:nothing={a.action === 'do_nothing'}>
 								{actionLabel(a)}
 							</div>
+						{/each}
+					</div>
+				{/if}
+
+				{#if totalRounds > 1}
+					<h3>All rounds</h3>
+					<div class="rounds-list">
+						{#each snapshots as snap}
+							<button
+								class="round-btn"
+								class:active={displayRound === snap.round}
+								onclick={() => (viewingRound = snap.round)}
+							>
+								<span class="round-num">R{snap.round}</span>
+								<span class="round-summary">
+									{snap.actions.filter((a) => a.action === 'create_post').length} posts,
+									{snap.actions.filter((a) => a.action === 'like_post').length} likes,
+									{snap.actions.filter((a) => a.action === 'create_comment').length} comments
+								</span>
+							</button>
 						{/each}
 					</div>
 				{/if}
@@ -239,11 +318,17 @@
 					<div class="error">{error}</div>
 				{/if}
 
-				{#if posts.length === 0}
+				{#if !isLive && totalRounds > 0}
+					<div class="viewing-past">
+						Viewing round {viewingRound} of {totalRounds}
+					</div>
+				{/if}
+
+				{#if displayPosts.length === 0}
 					<div class="empty">No posts yet. Run the first round to start the simulation.</div>
 				{/if}
 
-				{#each posts as post}
+				{#each displayPosts as post}
 					<article class="post">
 						<div class="post-header">
 							<strong>{post.userName}</strong>
@@ -606,6 +691,107 @@
 	.action-item.comment {
 		background: #1a3a2a;
 		color: #00ba7c;
+	}
+
+	/* --- Timeline --- */
+	.timeline {
+		margin-bottom: 20px;
+	}
+
+	.slider {
+		width: 100%;
+		height: 4px;
+		appearance: none;
+		background: #2f3336;
+		border-radius: 2px;
+		outline: none;
+		cursor: pointer;
+	}
+
+	.slider::-webkit-slider-thumb {
+		appearance: none;
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: #1d9bf0;
+		cursor: pointer;
+	}
+
+	.timeline-labels {
+		display: flex;
+		justify-content: space-between;
+		font-size: 11px;
+		color: #71767b;
+		margin-top: 4px;
+	}
+
+	.timeline-current {
+		color: #1d9bf0;
+		font-weight: 600;
+	}
+
+	.live-btn {
+		width: 100%;
+		margin-top: 8px;
+		padding: 6px;
+		background: none;
+		border: 1px solid #1d9bf0;
+		color: #1d9bf0;
+		border-radius: 6px;
+		font-size: 12px;
+		cursor: pointer;
+	}
+
+	.live-btn:hover {
+		background: #1d3a5c;
+	}
+
+	.rounds-list {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.round-btn {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 8px 10px;
+		background: none;
+		border: 1px solid #2f3336;
+		border-radius: 6px;
+		color: #e7e9ea;
+		font-size: 12px;
+		cursor: pointer;
+		text-align: left;
+	}
+
+	.round-btn:hover {
+		border-color: #536471;
+	}
+
+	.round-btn.active {
+		border-color: #1d9bf0;
+		background: #1d3a5c;
+	}
+
+	.round-num {
+		font-weight: 700;
+		min-width: 24px;
+	}
+
+	.round-summary {
+		color: #71767b;
+	}
+
+	.viewing-past {
+		background: #1d3a5c;
+		color: #1d9bf0;
+		padding: 8px 20px;
+		font-size: 13px;
+		text-align: center;
+		font-weight: 600;
 	}
 
 	.sim-feed {
