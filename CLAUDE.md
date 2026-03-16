@@ -1,19 +1,30 @@
-# Oasis Mini
+# Shanks
 
-Simulador de red social con agentes LLM, inspirado en OASIS.
+Motor de predicción con agentes LLM, inspirado en OASIS + MiroFish.
+Replica la arquitectura de ambos proyectos inhouse, sin depender de su código.
 
 ## Referencia
-El código original de OASIS está en /Users/rafael/works/oasis-reference.
-Siempre consulta ese código antes de implementar cualquier funcionalidad.
-No inventes mecánicas que no existan en OASIS sin preguntar primero.
+- OASIS (motor de simulación social): /Users/rafael/works/oasis-reference
+- MiroFish (producto de predicción): github.com/666ghj/MiroFish
+- Documento del proyecto: PROJECT.md (pipeline completo, modelo de datos, roadmap)
+
+Siempre consulta la referencia antes de implementar cualquier funcionalidad.
+No inventes mecánicas que no existan en OASIS o MiroFish sin preguntar primero.
 
 ## Stack
 - SvelteKit + TypeScript
-- Supabase (PostgreSQL)
-- Drizzle ORM
-- Ollama (llama3.1:8b, localhost:11434)
+- Supabase (PostgreSQL), schema `shanks`
+- Drizzle ORM (NO usar drizzle-kit push/migrate, crear tablas manualmente via psql)
+- MiniMax M2.5 (API, OpenAI-compatible)
+- Ollama + Qwen 3 14B (alternativa local)
+
+## DB
+- Schema: `shanks` en Supabase
+- Crear tablas via psql, nunca via migraciones automáticas
+- psql: /opt/homebrew/Cellar/libpq/18.3/bin/psql "postgresql://supabase_admin.87608c9a427eefa1:...@db.soyrafa.dev:5432/postgres"
 
 ## Principios
-- Incremental: construir sprint por sprint
+- Fiel a OASIS + MiroFish: adaptar, no inventar
+- Incremental: un sprint a la vez
 - Simple: no sobreingenieriear
-- Fiel a OASIS: adaptar, no inventar
+- Inhouse: cero dependencias de OASIS o MiroFish como código

@@ -1,22 +1,23 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { Agent } from '$lib/agents';
+import { Agent, type FeedPost } from '$lib/agents';
 import { db } from '$lib/server/db';
-import { users, posts } from '$lib/server/schema';
+import { users, posts, likes } from '$lib/server/schema';
 import { MINIMAX_API_KEY } from '$env/static/private';
+import { desc, eq, sql } from 'drizzle-orm';
 
 /**
  * Simulation endpoint adapted from OASIS's simulation loop.
  *
  * OASIS flow (oasis/environment/env.py):
  *   1. reset() — create agents, sign them up
- *   2. step(actions) — each agent performs actions in parallel
- *   3. Results saved to database
+ *   2. update_rec_table() — refresh recommendations
+ *   3. step(actions) — each agent observes feed + decides action in parallel
+ *   4. Results saved to database
  *
- * We simplify: one endpoint that does reset + one step of CREATE_POST.
+ * Sprint 2: agents observe the feed and decide to create_post, like_post, or do_nothing.
  */
 
-// Hardcoded agent profiles (like OASIS's agent CSV data)
 const AGENT_PROFILES = [
 	{
 		name: 'Maya Chen',
@@ -59,26 +60,84 @@ export const POST: RequestHandler = async () => {
 			})
 		);
 
-		// Step 2: "step" — Each agent generates a post (parallel, like OASIS asyncio.gather)
-		const generatedPosts = await Promise.all(
+		// Step 2: Get current feed (like OASIS refresh / to_text_prompt)
+		const currentPosts = await db
+			.select({
+				id: posts.id,
+				content: posts.content,
+				numLikes: posts.numLikes,
+				userName: users.name
+			})
+			.from(posts)
+			.innerJoin(users, eq(posts.userId, users.id))
+			.orderBy(desc(posts.createdAt))
+			.limit(20);
+
+		const feed: FeedPost[] = currentPosts.map((p) => ({
+			post_id: p.id,
+			user_name: p.userName,
+			content: p.content,
+			num_likes: p.numLikes
+		}));
+
+		// Step 3: Each agent observes feed + decides action (parallel, like OASIS asyncio.gather)
+		const results = await Promise.all(
 			agents.map(async (agent, i) => {
-				const content = await agent.generatePost(MINIMAX_API_KEY);
-				const [post] = await db
-					.insert(posts)
-					.values({
-						userId: userRecords[i].id,
-						content
-					})
-					.returning();
-				return {
-					...post,
-					userName: agent.name,
-					userBio: agent.bio
-				};
+				const userId = userRecords[i].id;
+				const action = await agent.decideAction(MINIMAX_API_KEY, feed);
+
+				switch (action.type) {
+					case 'create_post': {
+						const [post] = await db
+							.insert(posts)
+							.values({ userId, content: action.content })
+							.returning();
+						return {
+							agent: agent.name,
+							action: 'create_post' as const,
+							post: { ...post, userName: agent.name, userBio: agent.bio }
+						};
+					}
+					case 'like_post': {
+						try {
+							await db.insert(likes).values({ userId, postId: action.post_id });
+							await db
+								.update(posts)
+								.set({ numLikes: sql`${posts.numLikes} + 1` })
+								.where(eq(posts.id, action.post_id));
+							return {
+								agent: agent.name,
+								action: 'like_post' as const,
+								postId: action.post_id
+							};
+						} catch {
+							// Already liked or invalid post — treat as do_nothing
+							return { agent: agent.name, action: 'do_nothing' as const };
+						}
+					}
+					default:
+						return { agent: agent.name, action: 'do_nothing' as const };
+				}
 			})
 		);
 
-		return json({ posts: generatedPosts });
+		// Return full updated feed for the UI
+		const updatedPosts = await db
+			.select({
+				id: posts.id,
+				userId: posts.userId,
+				content: posts.content,
+				numLikes: posts.numLikes,
+				createdAt: posts.createdAt,
+				userName: users.name,
+				userBio: users.bio
+			})
+			.from(posts)
+			.innerJoin(users, eq(posts.userId, users.id))
+			.orderBy(desc(posts.createdAt))
+			.limit(50);
+
+		return json({ actions: results, posts: updatedPosts });
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unknown error';
 		return json({ error: message }, { status: 500 });
