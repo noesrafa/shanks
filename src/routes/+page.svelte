@@ -232,7 +232,11 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		loading = true;
 		error = '';
 		try {
-			const res = await fetch('/api/simulate', { method: 'POST' });
+			const res = await fetch('/api/simulate', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ projectId: projectId || undefined })
+			});
 			const data = await res.json();
 			if (data.error) {
 				error = data.error;
