@@ -31,8 +31,8 @@ async function generateAgentProfile(
 	);
 
 	const system = isIndividual
-		? `You are a social media persona generator. Generate a realistic persona for an INDIVIDUAL participating in a social simulation. Return ONLY valid JSON, no other text.`
-		: `You are a social media persona generator. Generate a persona for an OFFICIAL ACCOUNT REPRESENTATIVE of an organization. Return ONLY valid JSON, no other text.`;
+		? `You generate social media personas for simulation. Create a SPECIFIC, OPINIONATED individual — not a generic placeholder. They should feel like a real person with flaws, biases, and a distinct voice. Return ONLY valid JSON.`
+		: `You generate social media personas for simulation. Create a persona for someone who runs this organization's social media. They should have a clear institutional voice but also personality quirks. Return ONLY valid JSON.`;
 
 	const user = `Entity: ${entity.name} (${entity.entityType})
 Summary: ${entity.summary}
@@ -40,10 +40,10 @@ Context: ${context}
 Simulation question: ${requirement}
 
 Return this exact JSON structure:
-{"bio": "200 char bio", "persona": "500-1000 char personality", "interests": "tag1, tag2, tag3", "stance": "supportive", "activity_level": 0.5}
+{"bio": "punchy 200 char bio, written in first person like a real social media bio", "persona": "500-1000 chars. Include: their SPECIFIC opinion on the simulation question, HOW they argue (aggressive? diplomatic? sarcastic?), what makes them ANGRY, what they would FIGHT about online, their blind spots and biases. Be concrete, not generic.", "interests": "tag1, tag2, tag3", "stance": "supportive", "activity_level": 0.5}
 
-stance must be one of: supportive, opposing, neutral, observer
-activity_level: 0.0 to 1.0`;
+stance: supportive (pro the main issue), opposing (against), neutral (genuinely undecided), observer (watches but rarely engages)
+activity_level: 0.0 to 1.0 — trolls and activists are 0.8-1.0, institutions 0.3-0.5, observers 0.1-0.3`;
 
 	for (let attempt = 0; attempt < 2; attempt++) {
 		try {

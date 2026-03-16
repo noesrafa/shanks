@@ -14,6 +14,7 @@ export interface AgentProfile {
 	name: string;
 	bio: string;
 	interests: string;
+	persona?: string;
 }
 
 // Matches OASIS post structure with comments array (platform_utils._add_comments_to_posts)
@@ -132,52 +133,75 @@ export class Agent {
 	name: string;
 	bio: string;
 	interests: string;
+	persona: string;
 
 	constructor(profile: AgentProfile) {
 		this.name = profile.name;
 		this.bio = profile.bio;
 		this.interests = profile.interests;
+		this.persona = profile.persona || '';
 	}
 
 	/**
 	 * Builds system message following OASIS pattern:
 	 * OBJECTIVE + SELF-DESCRIPTION + RESPONSE METHOD
 	 * (from UserInfo.to_twitter_system_message)
+	 *
+	 * Enhanced: stronger persona, stance enforcement, encourages conflict.
 	 */
 	private buildSystemMessage(): string {
-		return [
+		const parts = [
 			'# OBJECTIVE',
-			"You're a social media user. After observing the feed, choose an action.",
+			"You are a real person on social media. You have strong opinions and a distinct voice.",
+			'You are NOT an AI assistant. Never be generic, polite, or agreeable just for the sake of it.',
+			'If you disagree with something, say so directly. If a post annoys you, push back.',
 			'',
-			'# SELF-DESCRIPTION',
-			`Your name is ${this.name}.`,
+			'# WHO YOU ARE',
+			`Name: ${this.name}`,
 			`Bio: ${this.bio}`,
-			`Your interests include: ${this.interests}.`,
+			`Interests: ${this.interests}`,
+		];
+
+		if (this.persona) {
+			parts.push('', '# YOUR PERSONALITY AND STANCE', this.persona);
+		}
+
+		parts.push(
+			'',
+			'# RULES',
+			'- Write like a real person, not a press release. Use casual language, hot takes, strong opinions.',
+			'- NEVER start with "This is exactly the kind of..." or generic praise. Be specific.',
+			'- If you see a post you disagree with based on your stance, CHALLENGE IT. Argue. Push back.',
+			'- If you see a post you agree with, add something new — don\'t just repeat what they said.',
+			'- Keep posts short (1-3 sentences). No hashtag spam. No corporate speak.',
+			'- Your personality should be obvious from how you write.',
 			'',
 			'# RESPONSE METHOD',
-			'Please perform actions by calling one of the available functions.',
-			'Your actions should be consistent with your personality and interests.',
-			'Do not limit yourself to just liking posts — also create posts and comment on others.'
-		].join('\n');
+			'Call one of the available functions. Choose the action that YOUR CHARACTER would actually do.'
+		);
+
+		return parts.join('\n');
 	}
 
 	/**
 	 * Builds environment prompt following OASIS SocialEnvironment.to_text_prompt().
 	 * Shows the current feed as JSON with comments (like OASIS _add_comments_to_posts).
+	 *
+	 * Enhanced: encourages diverse actions and authentic reactions.
 	 */
 	private buildEnvironmentPrompt(feed: FeedPost[]): string {
 		if (feed.length === 0) {
-			return 'After refreshing, there are no existing posts. Create a new post!';
+			return 'The feed is empty. Write the first post — share your real opinion on whatever is on your mind.';
 		}
 
 		const postsJson = JSON.stringify(feed, null, 4);
 		return [
-			'Here are the latest posts on the platform:',
+			'Current feed:',
 			postsJson,
 			'',
-			'Pick one action that best reflects your current inclination',
-			'based on your profile and the posts content.',
-			'Do not limit your action to just liking posts.'
+			'React authentically. If something resonates, engage. If something bothers you, push back.',
+			'You can also ignore the feed entirely and post about what YOU care about.',
+			'Do NOT just agree with everyone. Be yourself.'
 		].join('\n');
 	}
 

@@ -112,11 +112,11 @@ async function loadAgents(projectId?: number): Promise<{ agent: Agent; userId: n
 			.where(eq(agents.projectId, projectId));
 
 		return projectAgents.map((a) => ({
-			// Use persona as enhanced system context for the agent
 			agent: new Agent({
 				name: a.name,
-				bio: a.bio + '\n\nPersona: ' + a.persona,
-				interests: a.interests
+				bio: a.bio,
+				interests: a.interests,
+				persona: a.persona
 			}),
 			userId: a.userId,
 			name: a.name,
