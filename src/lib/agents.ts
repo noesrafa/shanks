@@ -2,12 +2,12 @@
  * Agent class adapted from OASIS's SocialAgent + UserInfo.
  *
  * OASIS pattern (oasis/social_agent/agent.py):
- *   1. Agent observes environment via to_text_prompt() (posts as JSON)
+ *   1. Agent observes environment via to_text_prompt() (posts + comments as JSON)
  *   2. LLM receives system message (persona) + user message (environment)
  *   3. LLM decides action via OpenAI tool calling
- *   4. Action is executed (create_post, like_post, etc.)
+ *   4. Action is executed (create_post, like_post, create_comment, etc.)
  *
- * We adapt this with MiniMax M2.5 and a simplified action space.
+ * We adapt this with MiniMax M2.5 and a growing action space.
  */
 
 export interface AgentProfile {
@@ -16,16 +16,25 @@ export interface AgentProfile {
 	interests: string;
 }
 
+// Matches OASIS post structure with comments array (platform_utils._add_comments_to_posts)
+export interface FeedComment {
+	comment_id: number;
+	user_name: string;
+	content: string;
+}
+
 export interface FeedPost {
 	post_id: number;
 	user_name: string;
 	content: string;
 	num_likes: number;
+	comments: FeedComment[];
 }
 
 export type AgentAction =
 	| { type: 'create_post'; content: string }
 	| { type: 'like_post'; post_id: number }
+	| { type: 'create_comment'; post_id: number; content: string }
 	| { type: 'do_nothing' };
 
 const MINIMAX_BASE_URL = 'https://api.minimax.io/v1';
@@ -64,6 +73,27 @@ const ACTION_TOOLS = [
 					}
 				},
 				required: ['post_id']
+			}
+		}
+	},
+	{
+		type: 'function' as const,
+		function: {
+			name: 'create_comment',
+			description: 'Write a comment on an existing post by its ID.',
+			parameters: {
+				type: 'object',
+				properties: {
+					post_id: {
+						type: 'number',
+						description: 'The ID of the post to comment on'
+					},
+					content: {
+						type: 'string',
+						description: 'The text content of the comment (1-2 sentences)'
+					}
+				},
+				required: ['post_id', 'content']
 			}
 		}
 	},
@@ -109,13 +139,13 @@ export class Agent {
 			'# RESPONSE METHOD',
 			'Please perform actions by calling one of the available functions.',
 			'Your actions should be consistent with your personality and interests.',
-			'Do not limit yourself to just liking posts — also create original posts.'
+			'Do not limit yourself to just liking posts — also create posts and comment on others.'
 		].join('\n');
 	}
 
 	/**
 	 * Builds environment prompt following OASIS SocialEnvironment.to_text_prompt().
-	 * Shows the current feed as JSON (same format OASIS uses).
+	 * Shows the current feed as JSON with comments (like OASIS _add_comments_to_posts).
 	 */
 	private buildEnvironmentPrompt(feed: FeedPost[]): string {
 		if (feed.length === 0) {
@@ -183,6 +213,8 @@ export class Agent {
 					return { type: 'create_post', content: args.content };
 				case 'like_post':
 					return { type: 'like_post', post_id: args.post_id };
+				case 'create_comment':
+					return { type: 'create_comment', post_id: args.post_id, content: args.content };
 				case 'do_nothing':
 					return { type: 'do_nothing' };
 			}

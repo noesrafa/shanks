@@ -1,8 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { Agent, type FeedPost } from '$lib/agents';
+import { Agent, type FeedPost, type FeedComment } from '$lib/agents';
 import { db } from '$lib/server/db';
-import { users, posts, likes } from '$lib/server/schema';
+import { users, posts, likes, comments } from '$lib/server/schema';
 import { MINIMAX_API_KEY } from '$env/static/private';
 import { desc, eq, sql } from 'drizzle-orm';
 
@@ -15,7 +15,7 @@ import { desc, eq, sql } from 'drizzle-orm';
  *   3. step(actions) — each agent observes feed + decides action in parallel
  *   4. Results saved to database
  *
- * Sprint 2: agents observe the feed and decide to create_post, like_post, or do_nothing.
+ * Sprint 3: adds create_comment action + comments in feed + 5 agents.
  */
 
 const AGENT_PROFILES = [
@@ -33,6 +33,16 @@ const AGENT_PROFILES = [
 		name: 'Priya Sharma',
 		bio: 'Climate activist and environmental science student. Every action counts.',
 		interests: 'climate change, sustainability, renewable energy, veganism, activism'
+	},
+	{
+		name: 'Jordan Blake',
+		bio: 'Indie game developer and retro computing enthusiast. Building worlds one pixel at a time.',
+		interests: 'game development, pixel art, retro gaming, indie music, programming'
+	},
+	{
+		name: 'Amara Osei',
+		bio: 'Startup founder in fintech. Obsessed with financial inclusion across Africa.',
+		interests: 'fintech, startups, Africa, mobile payments, venture capital, economics'
 	}
 ];
 
@@ -60,7 +70,7 @@ export const POST: RequestHandler = async () => {
 			})
 		);
 
-		// Step 2: Get current feed (like OASIS refresh / to_text_prompt)
+		// Step 2: Get current feed with comments (like OASIS _add_comments_to_posts)
 		const currentPosts = await db
 			.select({
 				id: posts.id,
@@ -73,12 +83,35 @@ export const POST: RequestHandler = async () => {
 			.orderBy(desc(posts.createdAt))
 			.limit(20);
 
-		const feed: FeedPost[] = currentPosts.map((p) => ({
-			post_id: p.id,
-			user_name: p.userName,
-			content: p.content,
-			num_likes: p.numLikes
-		}));
+		// Attach comments to each post (like OASIS platform_utils._add_comments_to_posts)
+		const feed: FeedPost[] = await Promise.all(
+			currentPosts.map(async (p) => {
+				const postComments = await db
+					.select({
+						id: comments.id,
+						content: comments.content,
+						userName: users.name
+					})
+					.from(comments)
+					.innerJoin(users, eq(comments.userId, users.id))
+					.where(eq(comments.postId, p.id))
+					.orderBy(comments.createdAt);
+
+				const feedComments: FeedComment[] = postComments.map((c) => ({
+					comment_id: c.id,
+					user_name: c.userName,
+					content: c.content
+				}));
+
+				return {
+					post_id: p.id,
+					user_name: p.userName,
+					content: p.content,
+					num_likes: p.numLikes,
+					comments: feedComments
+				};
+			})
+		);
 
 		// Step 3: Each agent observes feed + decides action (parallel, like OASIS asyncio.gather)
 		const results = await Promise.all(
@@ -111,7 +144,26 @@ export const POST: RequestHandler = async () => {
 								postId: action.post_id
 							};
 						} catch {
-							// Already liked or invalid post — treat as do_nothing
+							return { agent: agent.name, action: 'do_nothing' as const };
+						}
+					}
+					case 'create_comment': {
+						try {
+							const [comment] = await db
+								.insert(comments)
+								.values({
+									postId: action.post_id,
+									userId,
+									content: action.content
+								})
+								.returning();
+							return {
+								agent: agent.name,
+								action: 'create_comment' as const,
+								postId: action.post_id,
+								comment: comment.content
+							};
+						} catch {
 							return { agent: agent.name, action: 'do_nothing' as const };
 						}
 					}
@@ -121,8 +173,8 @@ export const POST: RequestHandler = async () => {
 			})
 		);
 
-		// Return full updated feed for the UI
-		const updatedPosts = await db
+		// Return full updated feed with comments for the UI
+		const allPosts = await db
 			.select({
 				id: posts.id,
 				userId: posts.userId,
@@ -137,7 +189,26 @@ export const POST: RequestHandler = async () => {
 			.orderBy(desc(posts.createdAt))
 			.limit(50);
 
-		return json({ actions: results, posts: updatedPosts });
+		// Attach comments to response posts
+		const postsWithComments = await Promise.all(
+			allPosts.map(async (p) => {
+				const postComments = await db
+					.select({
+						id: comments.id,
+						content: comments.content,
+						userName: users.name,
+						createdAt: comments.createdAt
+					})
+					.from(comments)
+					.innerJoin(users, eq(comments.userId, users.id))
+					.where(eq(comments.postId, p.id))
+					.orderBy(comments.createdAt);
+
+				return { ...p, comments: postComments };
+			})
+		);
+
+		return json({ actions: results, posts: postsWithComments });
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unknown error';
 		return json({ error: message }, { status: 500 });

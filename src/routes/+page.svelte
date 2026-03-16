@@ -1,4 +1,11 @@
 <script lang="ts">
+	interface Comment {
+		id: number;
+		content: string;
+		userName: string;
+		createdAt: string;
+	}
+
 	interface Post {
 		id: number;
 		userId: number;
@@ -7,6 +14,7 @@
 		createdAt: string;
 		userName: string;
 		userBio: string;
+		comments: Comment[];
 	}
 
 	interface ActionResult {
@@ -14,6 +22,7 @@
 		action: string;
 		post?: Post;
 		postId?: number;
+		comment?: string;
 	}
 
 	let posts: Post[] = $state([]);
@@ -47,6 +56,7 @@
 	function actionLabel(a: ActionResult): string {
 		if (a.action === 'create_post') return `${a.agent} wrote a new post`;
 		if (a.action === 'like_post') return `${a.agent} liked post #${a.postId}`;
+		if (a.action === 'create_comment') return `${a.agent} commented on #${a.postId}`;
 		return `${a.agent} did nothing`;
 	}
 </script>
@@ -68,7 +78,7 @@
 		<div class="actions-log">
 			<strong>Round {round}:</strong>
 			{#each lastActions as a}
-				<span class="action-chip" class:like={a.action === 'like_post'} class:post={a.action === 'create_post'} class:nothing={a.action === 'do_nothing'}>
+				<span class="action-chip" class:like={a.action === 'like_post'} class:post={a.action === 'create_post'} class:comment={a.action === 'create_comment'} class:nothing={a.action === 'do_nothing'}>
 					{actionLabel(a)}
 				</span>
 			{/each}
@@ -89,6 +99,17 @@
 					{/if}
 					<time>{new Date(post.createdAt).toLocaleString()}</time>
 				</div>
+
+				{#if post.comments && post.comments.length > 0}
+					<div class="comments">
+						{#each post.comments as comment}
+							<div class="comment">
+								<strong>{comment.userName}</strong>
+								<span>{comment.content}</span>
+							</div>
+						{/each}
+					</div>
+				{/if}
 			</article>
 		{/each}
 	</div>
@@ -183,6 +204,11 @@
 		color: #f91880;
 	}
 
+	.action-chip.comment {
+		background: #1a3a2a;
+		color: #00ba7c;
+	}
+
 	.action-chip.nothing {
 		background: #2f3336;
 		color: #71767b;
@@ -234,5 +260,27 @@
 	time {
 		color: #71767b;
 		font-size: 13px;
+	}
+
+	.comments {
+		margin-top: 12px;
+		padding-left: 16px;
+		border-left: 2px solid #2f3336;
+	}
+
+	.comment {
+		padding: 8px 0;
+		font-size: 14px;
+		line-height: 1.3;
+	}
+
+	.comment strong {
+		color: #e7e9ea;
+		margin-right: 6px;
+		font-size: 13px;
+	}
+
+	.comment span {
+		color: #d6d9db;
 	}
 </style>

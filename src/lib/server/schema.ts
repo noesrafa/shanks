@@ -36,3 +36,16 @@ export const likes = shanksSchema.table(
 	},
 	(t) => [unique().on(t.userId, t.postId)]
 );
+
+// Adapted from OASIS database.py: comment table (comment_id, post_id, user_id, content)
+export const comments = shanksSchema.table('comments', {
+	id: serial('id').primaryKey(),
+	postId: integer('post_id')
+		.references(() => posts.id)
+		.notNull(),
+	userId: integer('user_id')
+		.references(() => users.id)
+		.notNull(),
+	content: text('content').notNull(),
+	createdAt: timestamp('created_at').defaultNow().notNull()
+});
