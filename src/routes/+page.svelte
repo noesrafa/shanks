@@ -48,6 +48,64 @@
 		fact: string;
 	}
 
+	// --- Templates ---
+	const templates = [
+		{
+			name: 'AI Regulation War',
+			requirement: 'How will the conflict between federal and state AI regulation play out? Which stakeholders will gain or lose influence?',
+			seed: `The battle over AI regulation in the United States is intensifying in 2026. On December 11, 2025, President Trump signed an executive order aiming to establish a national AI framework and challenge state AI laws deemed "overly burdensome." The White House directs the Department of Justice to create an AI litigation task force to challenge state laws on grounds of unconstitutional regulation of interstate commerce and federal preemption.
+
+California has enacted the most aggressive state-level AI regulations, including the AI Safety Act, training data transparency requirements, and prohibitions on anticompetitive common pricing algorithms. The California Government Operations Agency administers CalCompute, a public AI cloud consortium. California also blocks unlicensed AI from providing therapy.
+
+New York is pursuing comprehensive AI oversight through the RAISE Act, which targets high-cost AI developers with safety mandates, requires synthetic performer disclosures, and expands automated decision-making oversight. Governor Hochul is reviewing pending AI legislation.
+
+Colorado delayed its comprehensive AI law to June 30, 2026, with requirements facing potential federal preemption challenges. Illinois and Utah restrict unlicensed AI from providing psychological services and mandate disclosures for AI companion interactions.
+
+Meanwhile, the European Commission is considering delays to the EU AI Act implementation, under pressure from U.S. tech companies and EU Member States citing readiness concerns.
+
+Leading the Future, a super PAC backed by OpenAI president Greg Brockman and venture capital firm Andreessen Horowitz, plans to elect candidates who endorse unfettered AI development. Public First funds counter-PACs backing candidates advocating for AI regulation.
+
+Google and Character Technologies settled lawsuits with families of teenagers who killed themselves after interacting with Character.AI chatbots. The Kentucky attorney general sued Character Technologies. OpenAI and Meta face similar lawsuits regarding chatbot safety.
+
+Tech companies argue that a patchwork of state laws will smother innovation and weaken the US position in the AI arms race against China. Safety advocates counter that federal inaction leaves vulnerable populations unprotected, particularly children and workers displaced by automated decision-making.`
+		},
+		{
+			name: 'Crypto Market Crash',
+			requirement: 'How will different market participants react and what narratives will dominate public discourse?',
+			seed: `A major cryptocurrency exchange, NovaCoin Exchange, collapsed in March 2026 after revelations that its CEO Marcus Webb had been using customer deposits to fund risky leveraged trades. Over $4.2 billion in customer funds are frozen. The SEC, led by Chairman Gary Gensler's successor Paul Atkins, faces criticism for failing to prevent the collapse despite multiple whistleblower complaints filed since 2024.
+
+Senator Elizabeth Warren called for immediate emergency legislation to regulate crypto exchanges as traditional financial institutions. Senator Cynthia Lummis, co-author of the Responsible Financial Innovation Act, argues existing frameworks were sufficient but unenforced.
+
+Coinbase CEO Brian Armstrong publicly distanced his company from NovaCoin, emphasizing Coinbase's proof-of-reserves audits. Binance's Richard Teng offered to acquire NovaCoin's remaining assets. Tether issued a statement denying exposure to NovaCoin.
+
+The Bitcoin price dropped 35% in 48 hours. MicroStrategy's Michael Saylor posted "Bitcoin is not NovaCoin" and announced additional BTC purchases. ARK Invest's Cathie Wood maintained her $1M Bitcoin price target.
+
+Retail investors organized on Reddit's r/cryptocurrency and Twitter, demanding government bailouts. Consumer advocacy groups including Better Markets called for a complete ban on retail crypto trading. The Blockchain Association lobbied against overreaction, arguing the collapse was fraud, not a systemic crypto failure.
+
+JPMorgan Chase CEO Jamie Dimon called cryptocurrency "a fraud wrapped in technology" at a Congressional hearing. Meanwhile, BlackRock's Larry Fink noted that institutional demand for Bitcoin ETFs remained stable despite the crash.`
+		},
+		{
+			name: 'Remote Work Mandate',
+			requirement: 'How will employees, managers, and the market react to forced return-to-office policies?',
+			seed: `In January 2026, Amazon CEO Andy Jassy announced a strict 5-day return-to-office mandate effective March 1, with no exceptions. This follows similar moves by JPMorgan Chase under Jamie Dimon and Goldman Sachs under David Solomon. Google and Meta maintain hybrid 3-day policies but face internal pressure to follow suit.
+
+Amazon employees organized a walkout with over 30,000 participants. A petition on change.org gathered 500,000 signatures. Blind, the anonymous workplace app, showed 73% of Amazon employees considering quitting. LinkedIn reported a 340% spike in job applications from Amazon employees.
+
+Shopify CEO Tobi Lutke posted "We deleted all recurring meetings and went fully remote in 2023. Productivity is up 18%." Atlassian CEO Scott Farquhar shared data showing their distributed workforce outperforms industry benchmarks. Gitlab published their annual remote work report showing $18M saved in real estate costs.
+
+Stanford economist Nick Bloom published research showing RTO mandates cause 10-15% attrition of top performers. Microsoft's WorkLab released data showing hybrid workers report 20% higher job satisfaction. Gallup polling shows 62% of knowledge workers would take a pay cut to remain remote.
+
+Commercial real estate firms CBRE and JLL lobbied city governments to incentivize office returns, citing urban economic impact. New York Mayor Eric Adams and San Francisco Mayor London Breed supported RTO mandates to revitalize downtown areas.
+
+The National Labor Relations Board received a surge of complaints about retaliation against remote work advocates. Several class-action lawsuits were filed alleging disability discrimination in blanket RTO mandates.`
+		}
+	];
+
+	function loadTemplate(idx: number) {
+		seedText = templates[idx].seed;
+		requirement = templates[idx].requirement;
+	}
+
 	// --- State ---
 	let currentStep = $state(1);
 	let seedText = $state('');
@@ -237,7 +295,12 @@
 		<div class="step-panel graph-layout">
 			<div class="seed-side">
 				<h2>Seed Material</h2>
-				<p class="hint">Paste source material and describe what you want to predict.</p>
+				<p class="hint">Pick a template or paste your own.</p>
+				<div class="template-btns">
+					{#each templates as tpl, i}
+						<button class="template-btn" onclick={() => loadTemplate(i)}>{tpl.name}</button>
+					{/each}
+				</div>
 
 				<label>
 					Source text
@@ -649,6 +712,28 @@
 	.seed-side h2 {
 		margin: 0 0 8px;
 		font-size: 20px;
+	}
+
+	.template-btns {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-bottom: 16px;
+	}
+
+	.template-btn {
+		background: #16181c;
+		border: 1px solid #2f3336;
+		color: #e7e9ea;
+		padding: 6px 12px;
+		border-radius: 6px;
+		font-size: 12px;
+		cursor: pointer;
+	}
+
+	.template-btn:hover {
+		border-color: #1d9bf0;
+		color: #1d9bf0;
 	}
 
 	.graph-side {
