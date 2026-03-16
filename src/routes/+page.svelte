@@ -134,6 +134,7 @@
 		if (a.action === 'create_post') return `${a.agent} posted`;
 		if (a.action === 'like_post') return `${a.agent} liked #${a.postId}`;
 		if (a.action === 'create_comment') return `${a.agent} commented #${a.postId}`;
+		if (a.action === 'follow') return `${a.agent} followed ${(a as any).target}`;
 		return `${a.agent} idle`;
 	}
 </script>
@@ -285,7 +286,7 @@
 					<h3>Round {displayRound} log</h3>
 					<div class="action-list">
 						{#each displayActions as a}
-							<div class="action-item" class:like={a.action === 'like_post'} class:post={a.action === 'create_post'} class:comment={a.action === 'create_comment'} class:nothing={a.action === 'do_nothing'}>
+							<div class="action-item" class:like={a.action === 'like_post'} class:post={a.action === 'create_post'} class:comment={a.action === 'create_comment'} class:follow={a.action === 'follow'} class:nothing={a.action === 'do_nothing'}>
 								{actionLabel(a)}
 							</div>
 						{/each}
@@ -303,9 +304,10 @@
 							>
 								<span class="round-num">R{snap.round}</span>
 								<span class="round-summary">
-									{snap.actions.filter((a) => a.action === 'create_post').length} posts,
-									{snap.actions.filter((a) => a.action === 'like_post').length} likes,
-									{snap.actions.filter((a) => a.action === 'create_comment').length} comments
+									{snap.actions.filter((a) => a.action === 'create_post').length}p
+									{snap.actions.filter((a) => a.action === 'like_post').length}l
+									{snap.actions.filter((a) => a.action === 'create_comment').length}c
+									{snap.actions.filter((a) => a.action === 'follow').length}f
 								</span>
 							</button>
 						{/each}
@@ -691,6 +693,11 @@
 	.action-item.comment {
 		background: #1a3a2a;
 		color: #00ba7c;
+	}
+
+	.action-item.follow {
+		background: #2a1a3a;
+		color: #a970ff;
 	}
 
 	/* --- Timeline --- */

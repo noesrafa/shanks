@@ -35,6 +35,7 @@ export type AgentAction =
 	| { type: 'create_post'; content: string }
 	| { type: 'like_post'; post_id: number }
 	| { type: 'create_comment'; post_id: number; content: string }
+	| { type: 'follow'; user_name: string }
 	| { type: 'do_nothing' };
 
 const MINIMAX_BASE_URL = 'https://api.minimax.io/v1';
@@ -94,6 +95,23 @@ const ACTION_TOOLS = [
 					}
 				},
 				required: ['post_id', 'content']
+			}
+		}
+	},
+	{
+		type: 'function' as const,
+		function: {
+			name: 'follow',
+			description: 'Follow another user to see more of their posts in your feed.',
+			parameters: {
+				type: 'object',
+				properties: {
+					user_name: {
+						type: 'string',
+						description: 'The name of the user to follow'
+					}
+				},
+				required: ['user_name']
 			}
 		}
 	},
@@ -215,6 +233,8 @@ export class Agent {
 					return { type: 'like_post', post_id: args.post_id };
 				case 'create_comment':
 					return { type: 'create_comment', post_id: args.post_id, content: args.content };
+				case 'follow':
+					return { type: 'follow', user_name: args.user_name };
 				case 'do_nothing':
 					return { type: 'do_nothing' };
 			}

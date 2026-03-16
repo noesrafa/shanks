@@ -49,3 +49,19 @@ export const comments = shanksSchema.table('comments', {
 	content: text('content').notNull(),
 	createdAt: timestamp('created_at').defaultNow().notNull()
 });
+
+// Adapted from OASIS database.py: follow table (follower_id, followee_id)
+export const follows = shanksSchema.table(
+	'follows',
+	{
+		id: serial('id').primaryKey(),
+		followerId: integer('follower_id')
+			.references(() => users.id)
+			.notNull(),
+		followeeId: integer('followee_id')
+			.references(() => users.id)
+			.notNull(),
+		createdAt: timestamp('created_at').defaultNow().notNull()
+	},
+	(t) => [unique().on(t.followerId, t.followeeId)]
+);
