@@ -351,6 +351,79 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		if (a.action === 'follow') return `${a.agent} followed ${(a as any).target}`;
 		return `${a.agent} idle`;
 	}
+
+	// --- Persist state to localStorage ---
+	const STORAGE_KEY = 'shanks_state';
+
+	interface SavedState {
+		currentStep: number;
+		seedText: string;
+		requirement: string;
+		projectId: number;
+		graphNodes: GraphNode[];
+		graphEdges: GraphEdge[];
+		ontology: any;
+		generatedAgents: GeneratedAgent[];
+		snapshots: RoundSnapshot[];
+		totalRounds: number;
+		viewingRound: number;
+		report: string;
+		reportStats: any;
+	}
+
+	function saveState() {
+		try {
+			const state: SavedState = {
+				currentStep,
+				seedText,
+				requirement,
+				projectId,
+				graphNodes,
+				graphEdges,
+				ontology,
+				generatedAgents,
+				snapshots,
+				totalRounds,
+				viewingRound,
+				report,
+				reportStats
+			};
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+		} catch {}
+	}
+
+	function loadState() {
+		try {
+			const raw = localStorage.getItem(STORAGE_KEY);
+			if (!raw) return;
+			const state: SavedState = JSON.parse(raw);
+			currentStep = state.currentStep ?? 1;
+			seedText = state.seedText ?? '';
+			requirement = state.requirement ?? '';
+			projectId = state.projectId ?? 0;
+			graphNodes = state.graphNodes ?? [];
+			graphEdges = state.graphEdges ?? [];
+			ontology = state.ontology ?? null;
+			generatedAgents = state.generatedAgents ?? [];
+			snapshots = state.snapshots ?? [];
+			totalRounds = state.totalRounds ?? 0;
+			viewingRound = state.viewingRound ?? 0;
+			report = state.report ?? '';
+			reportStats = state.reportStats ?? null;
+		} catch {}
+	}
+
+	// Auto-save on every state change
+	$effect(() => {
+		// Touch all reactive state to track dependencies
+		void [currentStep, seedText, requirement, projectId, graphNodes, graphEdges,
+			ontology, generatedAgents, snapshots, totalRounds, viewingRound, report, reportStats];
+		saveState();
+	});
+
+	// Load on mount (browser only)
+	import { onMount } from 'svelte';
+	onMount(() => loadState());
 </script>
 
 <!-- Top bar -->
