@@ -5,6 +5,15 @@
 	import Textarea from '$lib/components/ui/textarea.svelte';
 	import Badge from '$lib/components/ui/badge.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+	import {
+		Sprout, Users, Play, FileText, MessageCircle,
+		Plus, ArrowRight, ArrowLeft, Loader2, AlertCircle,
+		Heart, Clock, Network, GitBranch, Zap,
+		Bot, Send, ChevronRight, BarChart3,
+		Sparkles, BookOpen, CircleDot, Activity,
+		MessageSquare, UserCircle, Gauge, Hash,
+		RefreshCw, ExternalLink, FileBarChart
+	} from 'lucide-svelte';
 
 	// --- Types ---
 	interface Comment {
@@ -330,11 +339,11 @@ The National Labor Relations Board received a surge of complaints about retaliat
 	}
 
 	const steps = [
-		{ num: 1, label: 'Seed' },
-		{ num: 2, label: 'Agents' },
-		{ num: 3, label: 'Simulate' },
-		{ num: 4, label: 'Report' },
-		{ num: 5, label: 'Chat' }
+		{ num: 1, label: 'Seed', icon: Sprout },
+		{ num: 2, label: 'Agents', icon: Users },
+		{ num: 3, label: 'Simulate', icon: Play },
+		{ num: 4, label: 'Report', icon: FileText },
+		{ num: 5, label: 'Chat', icon: MessageCircle }
 	];
 
 	async function simulate() {
@@ -473,14 +482,13 @@ The National Labor Relations Board received a surge of complaints about retaliat
 
 			// Determine currentStep based on available data
 			if (generatedAgents.length > 0) {
-				// Check if there are posts (simulation ran)
 				if (data.posts && data.posts.length > 0) {
-					currentStep = 3; // simulation has data
+					currentStep = 3;
 				} else {
-					currentStep = 3; // agents exist, ready to simulate
+					currentStep = 3;
 				}
 			} else if (graphNodes.length > 0) {
-				currentStep = 2; // graph exists, ready for agents
+				currentStep = 2;
 			} else {
 				currentStep = 1;
 			}
@@ -490,7 +498,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 				report = data.report.content;
 				reportStats = data.report.stats;
 				if (generatedAgents.length > 0) {
-					currentStep = 4; // report exists — jump to report step
+					currentStep = 4;
 				}
 			}
 		} catch (e) {
@@ -533,6 +541,9 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		5: chatHistory.length > 0
 	} as Record<number, boolean>);
 
+	// Mobile sidebar toggle for steps 3-5
+	let mobileSidebarOpen = $state(false);
+
 	onMount(async () => {
 		const pid = getUrlProjectId();
 		if (pid) {
@@ -547,7 +558,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 	<nav class="hidden md:flex gap-1">
 		{#each steps as step}
 			<button
-				class="inline-flex items-center gap-1.5 border border-border text-muted-foreground px-3.5 py-1.5 rounded-md text-[11px] font-medium cursor-pointer transition-colors hover:border-muted-foreground hover:text-foreground"
+				class="inline-flex items-center gap-1.5 border border-border text-muted-foreground px-3 py-1.5 rounded-md text-[11px] font-medium cursor-pointer transition-colors hover:border-muted-foreground hover:text-foreground"
 				class:bg-primary={currentStep === step.num}
 				class:border-primary={currentStep === step.num}
 				class:text-white={currentStep === step.num}
@@ -555,7 +566,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 				class:text-success={stepHasData[step.num] && currentStep !== step.num}
 				onclick={() => (currentStep = step.num)}
 			>
-				<span class="font-bold text-[10px]">{step.num}</span>
+				<step.icon size={13} />
 				{step.label}
 			</button>
 		{/each}
@@ -563,7 +574,10 @@ The National Labor Relations Board received a surge of complaints about retaliat
 	<div class="flex-1"></div>
 	<ThemeToggle />
 	{#if projectId}
-		<Button variant="secondary" size="sm" class="ml-2" onclick={resetState}>New</Button>
+		<Button variant="secondary" size="sm" class="ml-2" onclick={resetState}>
+			<Plus size={13} class="rotate-45" />
+			<span class="hidden sm:inline">New</span>
+		</Button>
 	{/if}
 </header>
 
@@ -571,11 +585,17 @@ The National Labor Relations Board received a surge of complaints about retaliat
 <main class="flex-1 overflow-hidden">
 	{#if initialLoading}
 		<div class="h-full overflow-y-auto p-6 flex items-center justify-center">
-			<div class="text-muted-foreground text-sm text-center py-8">Loading project...</div>
+			<div class="text-muted-foreground text-sm text-center py-8 flex items-center gap-2">
+				<Loader2 size={16} class="animate-spin" />
+				Loading project...
+			</div>
 		</div>
 	{:else if initialError}
 		<div class="h-full overflow-y-auto p-6 flex flex-col items-center justify-center gap-4">
-			<div class="text-destructive text-sm">{initialError}</div>
+			<div class="text-destructive text-sm flex items-center gap-2">
+				<AlertCircle size={16} />
+				{initialError}
+			</div>
 			<Button onclick={resetState}>Start Fresh</Button>
 		</div>
 	{:else if currentStep === 1}
@@ -583,16 +603,25 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		<div class="h-full overflow-y-auto md:overflow-hidden flex flex-col md:flex-row gap-4 md:gap-6 p-4 md:p-6">
 			<!-- seed side -->
 			<div class="flex flex-col gap-3 md:w-96 md:flex-shrink-0 md:overflow-y-auto">
-				<h2 class="text-base font-semibold mb-2">Seed Material</h2>
-				<p class="text-sm text-muted-foreground">Pick a template or paste your own.</p>
+				<div class="flex items-center gap-2">
+					<Sprout size={18} class="text-primary" />
+					<h2 class="text-base font-semibold">Seed Material</h2>
+				</div>
+				<p class="text-sm text-muted-foreground">Pick a template or paste your own context.</p>
 				<div class="flex flex-wrap gap-2">
 					{#each templates as tpl, i}
-						<Button variant="outline" size="sm" onclick={() => loadTemplate(i)}>{tpl.name}</Button>
+						<Button variant="outline" size="sm" onclick={() => loadTemplate(i)}>
+							<BookOpen size={12} />
+							{tpl.name}
+						</Button>
 					{/each}
 				</div>
 
 				<label class="flex flex-col gap-1 text-xs text-muted-foreground font-medium">
-					Source text
+					<span class="flex items-center gap-1">
+						<FileText size={12} />
+						Source text
+					</span>
 					<Textarea
 						bind:value={seedText}
 						placeholder="Paste the article, document, or data..."
@@ -601,7 +630,10 @@ The National Labor Relations Board received a surge of complaints about retaliat
 				</label>
 
 				<label class="flex flex-col gap-1 text-xs text-muted-foreground font-medium">
-					Prediction question
+					<span class="flex items-center gap-1">
+						<Sparkles size={12} />
+						Prediction question
+					</span>
 					<Input
 						bind:value={requirement}
 						placeholder="e.g. How will the public react to this policy change?"
@@ -609,17 +641,27 @@ The National Labor Relations Board received a surge of complaints about retaliat
 				</label>
 
 				{#if graphError}
-					<div class="text-destructive text-sm">{graphError}</div>
+					<div class="text-destructive text-sm flex items-center gap-2">
+						<AlertCircle size={14} />
+						{graphError}
+					</div>
 				{/if}
 
 				<Button class="w-full" onclick={buildGraph} disabled={graphLoading || !seedText || !requirement}>
-					{graphLoading ? 'Extracting...' : 'Build Knowledge Graph'}
+					{#if graphLoading}
+						<Loader2 size={14} class="animate-spin" />
+						Extracting...
+					{:else}
+						<Network size={14} />
+						Build Knowledge Graph
+					{/if}
 				</Button>
 
 				{#if graphNodes.length > 0}
 					<div class="flex gap-2 mt-2">
 						<Button onclick={() => (currentStep = 2)}>
 							Next: Generate Agents
+							<ArrowRight size={14} />
 						</Button>
 					</div>
 				{/if}
@@ -628,22 +670,37 @@ The National Labor Relations Board received a surge of complaints about retaliat
 			<!-- graph side -->
 			<div class="flex-1 md:overflow-y-auto">
 				{#if graphNodes.length === 0 && !graphLoading}
-					<div class="text-muted-foreground text-sm text-center py-8">Knowledge graph will appear here after extraction.</div>
+					<div class="text-muted-foreground text-sm text-center py-16 flex flex-col items-center gap-3">
+						<Network size={32} class="opacity-30" />
+						Knowledge graph will appear here after extraction.
+					</div>
 				{:else if graphLoading}
-					<div class="text-muted-foreground text-sm text-center py-8">Extracting entities and relationships...</div>
+					<div class="text-muted-foreground text-sm text-center py-16 flex flex-col items-center gap-3">
+						<Loader2 size={32} class="animate-spin opacity-30" />
+						Extracting entities and relationships...
+					</div>
 				{:else}
 					<div class="flex gap-6 mb-4">
-						<div class="flex flex-col">
+						<div class="flex flex-col items-center">
 							<span class="text-2xl font-bold">{graphNodes.length}</span>
-							<span class="text-xs text-muted-foreground">Entities</span>
+							<span class="text-xs text-muted-foreground flex items-center gap-1">
+								<CircleDot size={10} />
+								Entities
+							</span>
 						</div>
-						<div class="flex flex-col">
+						<div class="flex flex-col items-center">
 							<span class="text-2xl font-bold">{graphEdges.length}</span>
-							<span class="text-xs text-muted-foreground">Relationships</span>
+							<span class="text-xs text-muted-foreground flex items-center gap-1">
+								<GitBranch size={10} />
+								Relationships
+							</span>
 						</div>
-						<div class="flex flex-col">
+						<div class="flex flex-col items-center">
 							<span class="text-2xl font-bold">{ontology?.entities?.length || 0}</span>
-							<span class="text-xs text-muted-foreground">Entity types</span>
+							<span class="text-xs text-muted-foreground flex items-center gap-1">
+								<Hash size={10} />
+								Types
+							</span>
 						</div>
 					</div>
 
@@ -661,10 +718,11 @@ The National Labor Relations Board received a surge of complaints about retaliat
 						{#each graphNodes as node}
 							<div class="rounded-lg border border-border p-3">
 								<div class="flex items-center gap-2 mb-1">
-									<strong>{node.name}</strong>
+									<CircleDot size={12} class="text-primary flex-shrink-0" />
+									<strong class="text-sm">{node.name}</strong>
 									<Badge variant="outline">{node.entityType}</Badge>
 								</div>
-								<div class="text-xs text-muted-foreground">{node.summary}</div>
+								<div class="text-xs text-muted-foreground ml-5">{node.summary}</div>
 							</div>
 						{/each}
 					</div>
@@ -677,7 +735,9 @@ The National Labor Relations Board received a surge of complaints about retaliat
 								{@const target = graphNodes.find((n) => n.id === edge.targetNodeId)}
 								<div class="flex items-center gap-2 text-sm">
 									<span class="text-foreground font-medium text-xs">{source?.name ?? '?'}</span>
+									<ChevronRight size={10} class="text-muted-foreground" />
 									<span class="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{edge.edgeType}</span>
+									<ChevronRight size={10} class="text-muted-foreground" />
 									<span class="text-foreground font-medium text-xs">{target?.name ?? '?'}</span>
 								</div>
 							{/each}
@@ -688,37 +748,61 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		</div>
 
 	{:else if currentStep === 2}
-		<!-- STEP 2: Agents (generated from graph, like MiroFish environment setup) -->
-		<div class="h-full overflow-y-auto p-6">
-			<div class="flex items-center justify-between mb-4">
-				<h2 class="text-base font-semibold mb-2">Agents</h2>
+		<!-- STEP 2: Agents (generated from graph) -->
+		<div class="h-full overflow-y-auto p-4 md:p-6">
+			<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
+				<div class="flex items-center gap-2">
+					<Users size={18} class="text-primary" />
+					<h2 class="text-base font-semibold">Agents</h2>
+				</div>
 				<div class="flex gap-4">
-					<div class="flex flex-col">
+					<div class="flex flex-col items-center">
 						<span class="text-2xl font-bold">{generatedAgents.length}</span>
-						<span class="text-xs text-muted-foreground">Agents</span>
+						<span class="text-xs text-muted-foreground flex items-center gap-1">
+							<Bot size={10} />
+							Agents
+						</span>
 					</div>
-					<div class="flex flex-col">
+					<div class="flex flex-col items-center">
 						<span class="text-2xl font-bold">{graphNodes.length}</span>
-						<span class="text-xs text-muted-foreground">Entities</span>
+						<span class="text-xs text-muted-foreground flex items-center gap-1">
+							<CircleDot size={10} />
+							Entities
+						</span>
 					</div>
-					<div class="flex flex-col">
+					<div class="flex flex-col items-center">
 						<span class="text-2xl font-bold">5</span>
-						<span class="text-xs text-muted-foreground">Actions</span>
+						<span class="text-xs text-muted-foreground flex items-center gap-1">
+							<Zap size={10} />
+							Actions
+						</span>
 					</div>
 				</div>
 			</div>
 
 			{#if generatedAgents.length === 0}
 				{#if agentsError}
-					<div class="text-destructive text-sm">{agentsError}</div>
+					<div class="text-destructive text-sm flex items-center gap-2">
+						<AlertCircle size={14} />
+						{agentsError}
+					</div>
 				{/if}
 
 				{#if projectId === 0}
-					<div class="text-muted-foreground text-sm text-center py-8">Build a knowledge graph in Step 1 first.</div>
+					<div class="text-muted-foreground text-sm text-center py-16 flex flex-col items-center gap-3">
+						<Users size={32} class="opacity-30" />
+						Build a knowledge graph in Step 1 first.
+					</div>
 				{:else}
 					<p class="text-sm text-muted-foreground">Generate agent personas from the {graphNodes.length} entities extracted in Step 1. Each entity becomes an agent with personality, stance, and behavior.</p>
 					<Button class="mt-3" onclick={generateAgents} disabled={agentsLoading || !projectId}>
-						{agentsLoading ? (agentsProgress || 'Generating...') : `Generate ${graphNodes.length} Agents`}
+						{#if agentsLoading}
+							<Loader2 size={14} class="animate-spin" />
+							{agentsProgress || 'Generating...'}
+						{:else}
+							<Sparkles size={14} />
+							Generate {graphNodes.length} Agents
+						{/if}
 					</Button>
 				{/if}
 			{:else}
@@ -726,6 +810,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 					{#each generatedAgents as agent}
 						<Card class="p-4 flex flex-col gap-2">
 							<div class="flex items-center gap-2 flex-wrap">
+								<UserCircle size={16} class="text-primary flex-shrink-0" />
 								<div class="font-semibold text-sm flex-1">{agent.name}</div>
 								<Badge variant="outline">{agent.entityType}</Badge>
 								{#if agent.stance === 'supportive'}
@@ -738,8 +823,9 @@ The National Labor Relations Board received a surge of complaints about retaliat
 							</div>
 							<div class="text-xs text-muted-foreground">{agent.bio}</div>
 							<div class="text-xs">{agent.persona}</div>
-							<div class="text-xs text-muted-foreground">
-								<span>Activity: {Math.round(agent.activityLevel * 100)}%</span>
+							<div class="text-xs text-muted-foreground flex items-center gap-1">
+								<Gauge size={10} />
+								Activity: {Math.round(agent.activityLevel * 100)}%
 							</div>
 							<div class="flex flex-wrap gap-1">
 								{#each (typeof agent.interests === 'string' ? agent.interests.split(',') : agent.interests) as tag}
@@ -751,17 +837,38 @@ The National Labor Relations Board received a surge of complaints about retaliat
 				</div>
 
 				<div class="flex gap-2 mt-4">
-					<Button variant="secondary" onclick={() => (currentStep = 1)}>Back</Button>
-					<Button onclick={() => (currentStep = 3)}>Next: Simulate</Button>
+					<Button variant="secondary" onclick={() => (currentStep = 1)}>
+						<ArrowLeft size={14} />
+						Back
+					</Button>
+					<Button onclick={() => (currentStep = 3)}>
+						Next: Simulate
+						<ArrowRight size={14} />
+					</Button>
 				</div>
 			{/if}
 		</div>
 
 	{:else if currentStep === 3}
 		<!-- STEP 3: Simulation with timeline -->
-		<div class="flex h-full overflow-hidden">
-			<div class="w-60 border-r border-border p-4 overflow-y-auto flex-shrink-0 flex flex-col gap-3">
-				<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Controls</h3>
+		<div class="flex flex-col md:flex-row h-full overflow-hidden">
+			<!-- Mobile toggle -->
+			<button
+				class="flex md:hidden items-center justify-between px-4 py-2 border-b border-border text-xs font-medium text-muted-foreground"
+				onclick={() => (mobileSidebarOpen = !mobileSidebarOpen)}
+			>
+				<span class="flex items-center gap-1.5">
+					<BarChart3 size={13} />
+					Controls & Timeline
+				</span>
+				<ChevronRight size={14} class={mobileSidebarOpen ? 'rotate-90 transition-transform' : 'transition-transform'} />
+			</button>
+
+			<div class="border-r border-border p-4 overflow-y-auto flex-shrink-0 flex flex-col gap-3 {mobileSidebarOpen ? 'block' : 'hidden'} md:block md:w-60">
+				<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+					<Play size={11} />
+					Controls
+				</h3>
 				{#if !seeded && totalRounds === 0}
 					<Button
 						variant="secondary"
@@ -769,31 +876,55 @@ The National Labor Relations Board received a surge of complaints about retaliat
 						onclick={generateSeedPosts}
 						disabled={seedLoading || !projectId}
 					>
-						{seedLoading ? 'Seeding...' : 'Seed posts'}
+						{#if seedLoading}
+							<Loader2 size={13} class="animate-spin" />
+							Seeding...
+						{:else}
+							<Sprout size={13} />
+							Seed posts
+						{/if}
 					</Button>
 				{/if}
 
 				<Button class="w-full" onclick={simulate} disabled={loading || !projectId}>
-					{loading ? 'Running...' : `Run round ${totalRounds + 1}`}
+					{#if loading}
+						<Loader2 size={13} class="animate-spin" />
+						Running...
+					{:else}
+						<Zap size={13} />
+						Run round {totalRounds + 1}
+					{/if}
 				</Button>
 
 				<div class="flex flex-col gap-1.5 rounded-lg border border-border p-3">
 					<div class="flex justify-between items-center text-xs">
-						<span>Rounds</span>
+						<span class="flex items-center gap-1.5">
+							<Activity size={10} />
+							Rounds
+						</span>
 						<strong>{totalRounds}</strong>
 					</div>
 					<div class="flex justify-between items-center text-xs">
-						<span>Posts</span>
+						<span class="flex items-center gap-1.5">
+							<FileText size={10} />
+							Posts
+						</span>
 						<strong>{displayPosts.length}</strong>
 					</div>
 					<div class="flex justify-between items-center text-xs">
-						<span>Agents</span>
+						<span class="flex items-center gap-1.5">
+							<Bot size={10} />
+							Agents
+						</span>
 						<strong>{agents.length}</strong>
 					</div>
 				</div>
 
 				{#if totalRounds > 0}
-					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Timeline</h3>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+						<Clock size={11} />
+						Timeline
+					</h3>
 					<div class="flex flex-col gap-1">
 						<input
 							type="range"
@@ -816,6 +947,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 						</div>
 						{#if !isLive}
 							<Button variant="ghost" size="sm" class="w-full" onclick={() => (viewingRound = 0)}>
+								<Zap size={12} />
 								Jump to live
 							</Button>
 						{/if}
@@ -823,7 +955,10 @@ The National Labor Relations Board received a surge of complaints about retaliat
 				{/if}
 
 				{#if displayActions.length > 0}
-					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Round {displayRound} log</h3>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+						<Activity size={11} />
+						Round {displayRound} log
+					</h3>
 					<div class="flex flex-col gap-1">
 						{#each displayActions as a}
 							<div
@@ -863,25 +998,36 @@ The National Labor Relations Board received a surge of complaints about retaliat
 
 			<div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
 				{#if error}
-					<div class="text-destructive text-sm">{error}</div>
+					<div class="text-destructive text-sm flex items-center gap-2">
+						<AlertCircle size={14} />
+						{error}
+					</div>
 				{/if}
 
 				{#if !isLive && totalRounds > 0}
-					<div class="text-xs text-muted-foreground text-center">
+					<div class="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
+						<Clock size={12} />
 						Viewing round {viewingRound} of {totalRounds}
 					</div>
 				{/if}
 
 				{#if displayPosts.length === 0 && seedPosts.length === 0}
-					<div class="text-muted-foreground text-sm text-center py-8">No posts yet. Seed posts to prime the feed, then run the first round.</div>
+					<div class="text-muted-foreground text-sm text-center py-16 flex flex-col items-center gap-3">
+						<Play size={32} class="opacity-30" />
+						No posts yet. Seed posts to prime the feed, then run the first round.
+					</div>
 				{/if}
 
 				{#if seeded && totalRounds === 0 && seedPosts.length > 0}
-					<div class="rounded-lg bg-success/10 text-success text-sm px-4 py-2">Seed posts ready — {seedPosts.length} initial posts. Run round 1 to start.</div>
+					<div class="rounded-lg bg-success/10 text-success text-sm px-4 py-2 flex items-center gap-2">
+						<Sprout size={14} />
+						Seed posts ready — {seedPosts.length} initial posts. Run round 1 to start.
+					</div>
 					{#each seedPosts as post}
 						<Card class="p-4 opacity-75">
 							<div class="flex items-center gap-2 mb-2">
-								<strong>{post.userName}</strong>
+								<UserCircle size={16} class="text-muted-foreground" />
+								<strong class="text-sm">{post.userName}</strong>
 								<Badge variant="outline" class="text-[10px]">seed</Badge>
 							</div>
 							<p class="text-sm">{post.content}</p>
@@ -892,21 +1038,29 @@ The National Labor Relations Board received a surge of complaints about retaliat
 				{#each displayPosts as post}
 					<Card class="p-4">
 						<div class="flex items-center gap-2 mb-2">
-							<strong>{post.userName}</strong>
+							<UserCircle size={16} class="text-primary flex-shrink-0" />
+							<strong class="text-sm">{post.userName}</strong>
 							<span class="text-xs text-muted-foreground truncate flex-1">{post.userBio}</span>
 						</div>
 						<p class="text-sm">{post.content}</p>
 						<div class="flex items-center gap-4 text-xs text-muted-foreground mt-2">
 							{#if post.numLikes > 0}
-								<span class="text-pink-500">&hearts; {post.numLikes}</span>
+								<span class="text-pink-500 flex items-center gap-1">
+									<Heart size={12} />
+									{post.numLikes}
+								</span>
 							{/if}
-							<time>{new Date(post.createdAt).toLocaleString()}</time>
+							<span class="flex items-center gap-1">
+								<Clock size={11} />
+								<time>{new Date(post.createdAt).toLocaleString()}</time>
+							</span>
 						</div>
 
 						{#if post.comments && post.comments.length > 0}
 							<div class="mt-3 border-t border-border pt-3 flex flex-col gap-2">
 								{#each post.comments as comment}
 									<div class="flex items-start gap-2 text-xs">
+										<MessageSquare size={11} class="text-muted-foreground mt-0.5 flex-shrink-0" />
 										<strong>{comment.userName}</strong>
 										<span>{comment.content}</span>
 									</div>
@@ -920,30 +1074,72 @@ The National Labor Relations Board received a surge of complaints about retaliat
 
 	{:else if currentStep === 4}
 		<!-- STEP 4: Prediction Report -->
-		<div class="flex h-full overflow-hidden">
-			<div class="w-80 border-r border-border p-4 overflow-y-auto flex-shrink-0 flex flex-col gap-3">
-				<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Report</h3>
+		<div class="flex flex-col md:flex-row h-full overflow-hidden">
+			<!-- Mobile toggle -->
+			<button
+				class="flex md:hidden items-center justify-between px-4 py-2 border-b border-border text-xs font-medium text-muted-foreground"
+				onclick={() => (mobileSidebarOpen = !mobileSidebarOpen)}
+			>
+				<span class="flex items-center gap-1.5">
+					<BarChart3 size={13} />
+					Report Controls
+				</span>
+				<ChevronRight size={14} class={mobileSidebarOpen ? 'rotate-90 transition-transform' : 'transition-transform'} />
+			</button>
+
+			<div class="border-r border-border p-4 overflow-y-auto flex-shrink-0 flex flex-col gap-3 {mobileSidebarOpen ? 'block' : 'hidden'} md:block md:w-80">
+				<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+					<FileBarChart size={11} />
+					Report
+				</h3>
 
 				{#if projectId === 0}
-					<div class="text-muted-foreground text-sm text-center py-8">Run the full pipeline first (Steps 1-3).</div>
+					<div class="text-muted-foreground text-sm text-center py-8 flex flex-col items-center gap-2">
+						<FileText size={24} class="opacity-30" />
+						Run the full pipeline first (Steps 1-3).
+					</div>
 				{:else if !report}
 					<p class="text-sm text-muted-foreground">Analyze the simulation results and generate a prediction report.</p>
 
 					{#if reportError}
-						<div class="text-destructive text-sm">{reportError}</div>
+						<div class="text-destructive text-sm flex items-center gap-2">
+							<AlertCircle size={14} />
+							{reportError}
+						</div>
 					{/if}
 
 					<Button class="w-full" onclick={generateReport} disabled={reportLoading}>
-						{reportLoading ? 'Analyzing...' : 'Generate Prediction Report'}
+						{#if reportLoading}
+							<Loader2 size={14} class="animate-spin" />
+							Analyzing...
+						{:else}
+							<FileBarChart size={14} />
+							Generate Prediction Report
+						{/if}
 					</Button>
 				{:else}
-					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Stats</h3>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+						<BarChart3 size={11} />
+						Stats
+					</h3>
 					{#if reportStats}
 						<div class="flex flex-col gap-1.5 rounded-lg border border-border p-3">
-							<div class="flex justify-between items-center text-xs"><span>Agents</span><strong>{reportStats.agents}</strong></div>
-							<div class="flex justify-between items-center text-xs"><span>Posts</span><strong>{reportStats.posts}</strong></div>
-							<div class="flex justify-between items-center text-xs"><span>Comments</span><strong>{reportStats.comments}</strong></div>
-							<div class="flex justify-between items-center text-xs"><span>Follows</span><strong>{reportStats.follows}</strong></div>
+							<div class="flex justify-between items-center text-xs">
+								<span class="flex items-center gap-1.5"><Bot size={10} /> Agents</span>
+								<strong>{reportStats.agents}</strong>
+							</div>
+							<div class="flex justify-between items-center text-xs">
+								<span class="flex items-center gap-1.5"><FileText size={10} /> Posts</span>
+								<strong>{reportStats.posts}</strong>
+							</div>
+							<div class="flex justify-between items-center text-xs">
+								<span class="flex items-center gap-1.5"><MessageSquare size={10} /> Comments</span>
+								<strong>{reportStats.comments}</strong>
+							</div>
+							<div class="flex justify-between items-center text-xs">
+								<span class="flex items-center gap-1.5"><Users size={10} /> Follows</span>
+								<strong>{reportStats.follows}</strong>
+							</div>
 						</div>
 
 						{#if reportStats.stances}
@@ -970,15 +1166,24 @@ The National Labor Relations Board received a surge of complaints about retaliat
 					{/if}
 
 					<div class="flex gap-2 mt-4">
-						<Button variant="secondary" onclick={() => { report = ''; }}>Regenerate</Button>
-						<Button onclick={() => (currentStep = 5)}>Next: Chat</Button>
+						<Button variant="secondary" onclick={() => { report = ''; }}>
+							<RefreshCw size={13} />
+							Regenerate
+						</Button>
+						<Button onclick={() => (currentStep = 5)}>
+							Next: Chat
+							<ArrowRight size={13} />
+						</Button>
 					</div>
 				{/if}
 			</div>
 
-			<div class="flex-1 overflow-y-auto p-6">
+			<div class="flex-1 overflow-y-auto p-4 md:p-6">
 				{#if reportLoading}
-					<div class="text-muted-foreground text-sm text-center py-8">Analyzing {reportStats?.posts || '...'} posts, {reportStats?.comments || '...'} comments, and {reportStats?.agents || '...'} agent behaviors...</div>
+					<div class="text-muted-foreground text-sm text-center py-16 flex flex-col items-center gap-3">
+						<Loader2 size={32} class="animate-spin opacity-30" />
+						Analyzing {reportStats?.posts || '...'} posts, {reportStats?.comments || '...'} comments, and {reportStats?.agents || '...'} agent behaviors...
+					</div>
 				{:else if report}
 					<article class="markdown">
 						{@html report
@@ -992,16 +1197,34 @@ The National Labor Relations Board received a surge of complaints about retaliat
 							.replace(/$/, '</p>')}
 					</article>
 				{:else}
-					<div class="text-muted-foreground text-sm text-center py-8">Generate a report to see the prediction analysis here.</div>
+					<div class="text-muted-foreground text-sm text-center py-16 flex flex-col items-center gap-3">
+						<FileBarChart size={32} class="opacity-30" />
+						Generate a report to see the prediction analysis here.
+					</div>
 				{/if}
 			</div>
 		</div>
 
 	{:else if currentStep === 5}
 		<!-- STEP 5: Deep Interaction -->
-		<div class="flex h-full overflow-hidden">
-			<div class="w-60 border-r border-border p-4 overflow-y-auto flex-shrink-0 flex flex-col gap-2">
-				<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Talk to</h3>
+		<div class="flex flex-col md:flex-row h-full overflow-hidden">
+			<!-- Mobile toggle -->
+			<button
+				class="flex md:hidden items-center justify-between px-4 py-2 border-b border-border text-xs font-medium text-muted-foreground"
+				onclick={() => (mobileSidebarOpen = !mobileSidebarOpen)}
+			>
+				<span class="flex items-center gap-1.5">
+					<MessageCircle size={13} />
+					Agent List
+				</span>
+				<ChevronRight size={14} class={mobileSidebarOpen ? 'rotate-90 transition-transform' : 'transition-transform'} />
+			</button>
+
+			<div class="border-r border-border p-4 overflow-y-auto flex-shrink-0 flex flex-col gap-2 {mobileSidebarOpen ? 'block' : 'hidden'} md:block md:w-60">
+				<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+					<MessageCircle size={11} />
+					Talk to
+				</h3>
 
 				<button
 					class="w-full text-left px-3 py-2 rounded-md border border-border text-sm cursor-pointer transition-colors hover:bg-accent"
@@ -1011,11 +1234,17 @@ The National Labor Relations Board received a surge of complaints about retaliat
 					class:text-primary={chatMode === 'report'}
 					onclick={() => switchChatMode('report')}
 				>
-					<span class="block font-medium text-xs">ReportAgent</span>
-					<span class="block text-[10px] text-muted-foreground">Ask about predictions</span>
+					<span class="flex items-center gap-1.5 font-medium text-xs">
+						<FileBarChart size={12} />
+						ReportAgent
+					</span>
+					<span class="block text-[10px] text-muted-foreground ml-5">Ask about predictions</span>
 				</button>
 
-				<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Interview agents</h3>
+				<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+					<Users size={11} />
+					Interview agents
+				</h3>
 				<div class="flex flex-col gap-1">
 					{#each generatedAgents as a}
 						<button
@@ -1026,9 +1255,12 @@ The National Labor Relations Board received a surge of complaints about retaliat
 							class:text-primary={chatMode === 'agent' && chatAgent === a.name}
 							onclick={() => switchChatMode('agent', a.name)}
 						>
-							<span class="block font-medium text-xs">{a.name}</span>
+							<span class="flex items-center gap-1.5 font-medium text-xs">
+								<UserCircle size={12} />
+								{a.name}
+							</span>
 							<span
-								class="block text-[10px]"
+								class="block text-[10px] ml-5"
 								class:text-success={a.stance === 'supportive'}
 								class:text-destructive={a.stance === 'opposing'}
 								class:text-muted-foreground={a.stance !== 'supportive' && a.stance !== 'opposing'}
@@ -1039,17 +1271,20 @@ The National Labor Relations Board received a surge of complaints about retaliat
 			</div>
 
 			<div class="flex-1 flex flex-col overflow-hidden">
-				<div class="px-4 py-3 border-b border-border text-sm flex-shrink-0">
+				<div class="px-4 py-3 border-b border-border text-sm flex-shrink-0 flex items-center gap-2">
 					{#if chatMode === 'report'}
+						<FileBarChart size={14} class="text-primary" />
 						Chatting with <strong>ReportAgent</strong>
 					{:else}
+						<UserCircle size={14} class="text-primary" />
 						Interviewing <strong>{chatAgent}</strong>
 					{/if}
 				</div>
 
 				<div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3" bind:this={chatMessagesEl}>
 					{#if chatHistory.length === 0}
-						<div class="text-muted-foreground text-sm text-center py-8">
+						<div class="text-muted-foreground text-sm text-center py-16 flex flex-col items-center gap-3">
+							<MessageCircle size={32} class="opacity-30" />
 							{#if chatMode === 'report'}
 								Ask the ReportAgent about its predictions, methodology, or specific agents.
 							{:else}
@@ -1069,7 +1304,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 								class:text-right={msg.role === 'user'}
 							>{msg.role === 'user' ? 'You' : chatMode === 'report' ? 'ReportAgent' : chatAgent}</div>
 							<div
-								class="rounded-lg px-3 py-2 text-sm max-w-xl"
+								class="rounded-lg px-3 py-2 text-sm max-w-[85%] md:max-w-xl"
 								class:bg-primary={msg.role === 'user'}
 								class:text-primary-foreground={msg.role === 'user'}
 								class:bg-card={msg.role === 'assistant'}
@@ -1082,7 +1317,10 @@ The National Labor Relations Board received a surge of complaints about retaliat
 					{#if chatLoading}
 						<div class="flex flex-col gap-1 items-start">
 							<div class="text-[10px] text-muted-foreground px-1">{chatMode === 'report' ? 'ReportAgent' : chatAgent}</div>
-							<div class="rounded-lg px-3 py-2 text-sm max-w-xl bg-card border border-border typing">Thinking...</div>
+							<div class="rounded-lg px-3 py-2 text-sm max-w-xl bg-card border border-border typing flex items-center gap-2">
+								<Loader2 size={12} class="animate-spin" />
+								Thinking...
+							</div>
 						</div>
 					{/if}
 				</div>
@@ -1095,7 +1333,10 @@ The National Labor Relations Board received a surge of complaints about retaliat
 						disabled={chatLoading}
 						class="flex-1"
 					/>
-					<Button onclick={sendChat} disabled={chatLoading || !chatInput.trim()}>Send</Button>
+					<Button onclick={sendChat} disabled={chatLoading || !chatInput.trim()}>
+						<Send size={14} />
+						<span class="hidden sm:inline">Send</span>
+					</Button>
 				</div>
 			</div>
 		</div>
@@ -1110,9 +1351,9 @@ The National Labor Relations Board received a surge of complaints about retaliat
 			class:text-primary={currentStep === step.num}
 			class:text-success={stepHasData[step.num] && currentStep !== step.num}
 			class:text-muted-foreground={!stepHasData[step.num] && currentStep !== step.num}
-			onclick={() => (currentStep = step.num)}
+			onclick={() => { currentStep = step.num; mobileSidebarOpen = false; }}
 		>
-			<span class="text-sm font-bold leading-none">{step.num}</span>
+			<step.icon size={16} />
 			<span class="text-[10px] font-medium">{step.label}</span>
 		</button>
 	{/each}

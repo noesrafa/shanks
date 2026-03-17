@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { themeStore, type Theme } from '$lib/stores/theme.svelte';
 	import { cn } from '$lib/utils';
+	import { Sun, Monitor, Moon } from 'lucide-svelte';
 
-	const options: { value: Theme; label: string; icon: string }[] = [
-		{ value: 'light', label: 'Light', icon: '☀️' },
-		{ value: 'auto', label: 'Auto', icon: '💻' },
-		{ value: 'dark', label: 'Dark', icon: '🌙' }
+	const options: { value: Theme; label: string; icon: typeof Sun }[] = [
+		{ value: 'light', label: 'Light', icon: Sun },
+		{ value: 'auto', label: 'Auto', icon: Monitor },
+		{ value: 'dark', label: 'Dark', icon: Moon }
 	];
 </script>
 
@@ -21,7 +22,7 @@
 					: 'text-muted-foreground hover:text-foreground hover:bg-accent'
 			)}
 		>
-			<span class="text-xs leading-none">{option.icon}</span>
+			<option.icon size={14} />
 			<span class="hidden sm:inline">{option.label}</span>
 		</button>
 	{/each}

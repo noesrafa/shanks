@@ -19,6 +19,6 @@
 	<title>Shanks</title>
 </svelte:head>
 
-<div class="app h-screen flex flex-col overflow-hidden">
+<div class="app h-screen flex flex-col overflow-hidden mx-auto max-w-[1200px]">
 	{@render children()}
 </div>
