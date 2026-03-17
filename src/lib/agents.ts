@@ -240,15 +240,23 @@ export class Agent {
 		}
 
 		const data = await response.json();
+		if (!data.choices?.length) {
+			throw new Error('MiniMax returned empty choices');
+		}
 		const message = data.choices[0].message;
 
 		// Extract tool call (like OASIS response.info['tool_calls'])
-		if (message.tool_calls && message.tool_calls.length > 0) {
+		if (message?.tool_calls && message.tool_calls.length > 0) {
 			const toolCall = message.tool_calls[0];
-			const args =
-				typeof toolCall.function.arguments === 'string'
-					? JSON.parse(toolCall.function.arguments)
-					: toolCall.function.arguments;
+			let args: Record<string, unknown>;
+			try {
+				args =
+					typeof toolCall.function.arguments === 'string'
+						? JSON.parse(toolCall.function.arguments)
+						: toolCall.function.arguments;
+			} catch {
+				args = {};
+			}
 
 			switch (toolCall.function.name) {
 				case 'create_post':
@@ -265,7 +273,7 @@ export class Agent {
 		}
 
 		// Fallback: if LLM responded with text instead of tool call, treat as post
-		const content = (message.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+		const content = (message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 		if (content) {
 			return { type: 'create_post', content };
 		}

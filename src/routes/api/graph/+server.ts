@@ -31,6 +31,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				status: 'generating_ontology'
 			})
 			.returning();
+		if (!project) throw new Error('Failed to create project');
 
 		// Step 1: Generate ontology (like MiroFish /api/graph/ontology/generate)
 		const ontology = await generateOntology(seedText, requirement);
@@ -56,7 +57,7 @@ export const POST: RequestHandler = async ({ request }) => {
 					attributes: entity.attributes
 				})
 				.returning();
-			nodeMap.set(entity.name, node.id);
+			if (node) nodeMap.set(entity.name, node.id);
 		}
 
 		// Store edges (only if both source and target exist)

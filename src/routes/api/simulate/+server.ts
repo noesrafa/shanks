@@ -130,7 +130,11 @@ async function loadAgents(projectId?: number): Promise<{ agent: Agent; userId: n
 			const existing = await db.query.users.findFirst({
 				where: (u, { eq }) => eq(u.name, profile.name)
 			});
-			const user = existing || (await db.insert(users).values(profile).returning())[0];
+			const [inserted] = await (!existing
+				? db.insert(users).values(profile).returning()
+				: Promise.resolve([]));
+			const user = existing ?? inserted;
+			if (!user) throw new Error(`Failed to create demo user ${profile.name}`);
 
 			return {
 				agent: new Agent(profile),
@@ -166,6 +170,7 @@ export const POST: RequestHandler = async ({ request }) => {
 							.insert(posts)
 							.values({ userId, content: action.content })
 							.returning();
+						if (!post) return { agent: name, action: 'do_nothing' as const };
 						return {
 							agent: name,
 							action: 'create_post' as const,
@@ -190,6 +195,7 @@ export const POST: RequestHandler = async ({ request }) => {
 								.insert(comments)
 								.values({ postId: action.post_id, userId, content: action.content })
 								.returning();
+							if (!comment) return { agent: name, action: 'do_nothing' as const };
 							return {
 								agent: name,
 								action: 'create_comment' as const,

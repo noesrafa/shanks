@@ -58,7 +58,10 @@ async function callLLM(system: string, user: string): Promise<string> {
 	}
 
 	const data = await response.json();
-	const raw = data.choices[0].message.content || '';
+	if (!data.choices?.length) {
+		throw new Error('LLM returned empty choices');
+	}
+	const raw = data.choices[0].message?.content || '';
 	return raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 }
 
@@ -66,7 +69,11 @@ function parseJSON<T>(text: string): T {
 	// Extract JSON from possible markdown fences
 	const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
 	const jsonStr = match ? match[1].trim() : text.trim();
-	return JSON.parse(jsonStr);
+	try {
+		return JSON.parse(jsonStr);
+	} catch {
+		throw new Error(`Failed to parse LLM JSON response: ${jsonStr.slice(0, 200)}`);
+	}
 }
 
 /**
