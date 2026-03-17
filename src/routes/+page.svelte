@@ -277,6 +277,9 @@ The National Labor Relations Board received a surge of complaints about retaliat
 	let totalRounds = $state(0);
 	let loading = $state(false);
 	let error = $state('');
+	let seedLoading = $state(false);
+	let seeded = $state(false);
+	let seedPosts: Post[] = $state([]);
 
 	// Derived: which snapshot to display
 	let displaySnapshot = $derived(
@@ -355,6 +358,30 @@ The National Labor Relations Board received a surge of complaints about retaliat
 			error = e instanceof Error ? e.message : 'Failed to connect';
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function generateSeedPosts() {
+		if (!projectId) return;
+		seedLoading = true;
+		error = '';
+		try {
+			const res = await fetch('/api/seed-posts', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ projectId })
+			});
+			const data = await res.json();
+			if (data.error) {
+				error = data.error;
+			} else {
+				seedPosts = data.posts;
+				seeded = true;
+			}
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to seed posts';
+		} finally {
+			seedLoading = false;
 		}
 	}
 
@@ -472,6 +499,8 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		snapshots = [];
 		totalRounds = 0;
 		viewingRound = 0;
+		seeded = false;
+		seedPosts = [];
 		report = '';
 		reportStats = null;
 		chatHistory = [];
@@ -709,6 +738,11 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		<div class="step-panel sim-layout">
 			<div class="sim-sidebar">
 				<h3>Controls</h3>
+				{#if !seeded && totalRounds === 0}
+					<button class="secondary full-width" onclick={generateSeedPosts} disabled={seedLoading || !projectId}>
+						{seedLoading ? 'Seeding...' : 'Seed posts'}
+					</button>
+				{/if}
 				<button class="primary full-width" onclick={simulate} disabled={loading || !projectId}>
 					{loading ? 'Running...' : `Run round ${totalRounds + 1}`}
 				</button>
@@ -802,8 +836,21 @@ The National Labor Relations Board received a surge of complaints about retaliat
 					</div>
 				{/if}
 
-				{#if displayPosts.length === 0}
-					<div class="empty">No posts yet. Run the first round to start the simulation.</div>
+				{#if displayPosts.length === 0 && seedPosts.length === 0}
+					<div class="empty">No posts yet. Seed posts to prime the feed, then run the first round.</div>
+				{/if}
+
+				{#if seeded && totalRounds === 0 && seedPosts.length > 0}
+					<div class="seed-banner">Seed posts ready — {seedPosts.length} initial posts. Run round 1 to start.</div>
+					{#each seedPosts as post}
+						<article class="post seed-post">
+							<div class="post-header">
+								<strong>{post.userName}</strong>
+								<span class="seed-label">seed</span>
+							</div>
+							<p class="post-content">{post.content}</p>
+						</article>
+					{/each}
 				{/if}
 
 				{#each displayPosts as post}
@@ -1620,6 +1667,31 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		text-align: center;
 		color: #71767b;
 		font-size: 14px;
+	}
+
+	.seed-banner {
+		margin: 12px;
+		padding: 10px 14px;
+		background: #1a2a1a;
+		border: 1px solid #2d4a2d;
+		border-radius: 8px;
+		color: #7ec87e;
+		font-size: 13px;
+	}
+
+	.seed-post {
+		border-left: 3px solid #2d4a2d;
+		opacity: 0.85;
+	}
+
+	.seed-label {
+		font-size: 11px;
+		color: #7ec87e;
+		background: #1a2a1a;
+		border: 1px solid #2d4a2d;
+		border-radius: 4px;
+		padding: 1px 6px;
+		margin-left: 8px;
 	}
 
 	.error {
