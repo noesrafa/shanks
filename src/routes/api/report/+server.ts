@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
-import { projects, users, posts, comments, likes, follows, agents, graphNodes } from '$lib/server/schema';
+import { projects, users, posts, comments, follows, agents, graphNodes } from '$lib/server/schema';
 import { MINIMAX_API_KEY } from '$env/static/private';
 import { eq, desc, sql } from 'drizzle-orm';
 
@@ -102,8 +102,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			.map((p) => `- ${p.userName}: "${p.content.slice(0, 150)}..." (${p.numLikes} likes)`)
 			.join('\n');
 
-		const followsSummary = (allFollows as any[])
-			.map((f: any) => `${f.follower} → ${f.following}`)
+		const followRows = allFollows as { follower: string; following: string }[];
+		const followsSummary = followRows
+			.map((f) => `${f.follower} → ${f.following}`)
 			.join(', ');
 
 		// Stance distribution
@@ -179,7 +180,10 @@ Based on this simulation data, write the prediction report. Focus on:
 		}
 
 		const data = await response.json();
-		const report = (data.choices[0].message.content || '')
+		if (!data.choices?.length) {
+			throw new Error('LLM returned empty choices');
+		}
+		const report = (data.choices[0].message?.content || '')
 			.replace(/<think>[\s\S]*?<\/think>/g, '')
 			.trim();
 
@@ -189,7 +193,7 @@ Based on this simulation data, write the prediction report. Focus on:
 				agents: agentList.length,
 				posts: allPosts.length,
 				comments: allComments.length,
-				follows: (allFollows as any[]).length,
+				follows: followRows.length,
 				stances: stanceCounts
 			}
 		});

@@ -32,7 +32,6 @@ export const POST: RequestHandler = async ({ request }) => {
 		if (!project) return json({ error: 'Project not found' }, { status: 404 });
 
 		let systemPrompt: string;
-		let contextMessages: { role: string; content: string }[] = [];
 
 		if (mode === 'agent' && agentName) {
 			// Interview mode: talk to a specific agent
@@ -141,7 +140,10 @@ ${report || 'No report generated yet.'}
 		}
 
 		const data = await response.json();
-		const reply = (data.choices[0].message.content || '')
+		if (!data.choices?.length) {
+			throw new Error('LLM returned empty choices');
+		}
+		const reply = (data.choices[0].message?.content || '')
 			.replace(/<think>[\s\S]*?<\/think>/g, '')
 			.trim();
 

@@ -67,13 +67,18 @@ activity_level: 0.0 to 1.0 — trolls and activists are 0.8-1.0, institutions 0.
 			if (!response.ok) continue;
 
 			const data = await response.json();
-			const raw = (data.choices[0].message.content || '')
+			if (!data.choices?.length) continue;
+			const raw = (data.choices[0].message?.content || '')
 				.replace(/<think>[\s\S]*?<\/think>/g, '')
 				.trim();
 
 			const match = raw.match(/```(?:json)?\s*([\s\S]*?)```/) || raw.match(/(\{[\s\S]*\})/);
 			if (match) {
-				return JSON.parse(match[1].trim());
+				try {
+					return JSON.parse(match[1].trim());
+				} catch {
+					continue;
+				}
 			}
 		} catch {
 			continue;
@@ -131,6 +136,7 @@ export const POST: RequestHandler = async ({ request }) => {
 						.insert(users)
 						.values({ name: node.name, bio: profile.bio, interests: profile.interests })
 						.returning();
+					if (!user) throw new Error(`Failed to insert user for ${node.name}`);
 
 					const [agent] = await db
 						.insert(agents)
@@ -143,6 +149,7 @@ export const POST: RequestHandler = async ({ request }) => {
 							activityLevel: profile.activity_level
 						})
 						.returning();
+					if (!agent) throw new Error(`Failed to insert agent for ${node.name}`);
 
 					return {
 						id: agent.id,
@@ -162,7 +169,11 @@ export const POST: RequestHandler = async ({ request }) => {
 			);
 
 			for (const r of results) {
-				if (r.status === 'fulfilled') generatedAgents.push(r.value);
+				if (r.status === 'fulfilled') {
+					generatedAgents.push(r.value);
+				} else {
+					console.error('Agent generation failed:', r.reason);
+				}
 			}
 		}
 
