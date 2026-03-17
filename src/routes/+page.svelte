@@ -542,9 +542,9 @@ The National Labor Relations Board received a surge of complaints about retaliat
 </script>
 
 <!-- Top bar -->
-<header class="flex items-center px-5 h-12 border-b border-border bg-background flex-shrink-0">
-	<div class="font-black text-sm tracking-widest mr-8 text-foreground">SHANKS</div>
-	<nav class="flex gap-1">
+<header class="flex items-center px-4 md:px-5 h-12 border-b border-border bg-background flex-shrink-0">
+	<div class="font-black text-sm tracking-widest mr-4 md:mr-8 text-foreground">SHANKS</div>
+	<nav class="hidden md:flex gap-1">
 		{#each steps as step}
 			<button
 				class="inline-flex items-center gap-1.5 border border-border text-muted-foreground px-3.5 py-1.5 rounded-md text-[11px] font-medium cursor-pointer transition-colors hover:border-muted-foreground hover:text-foreground"
@@ -563,7 +563,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 	<div class="flex-1"></div>
 	<ThemeToggle />
 	{#if projectId}
-		<Button variant="secondary" size="sm" class="ml-2" onclick={resetState}>New Project</Button>
+		<Button variant="secondary" size="sm" class="ml-2" onclick={resetState}>New</Button>
 	{/if}
 </header>
 
@@ -580,9 +580,9 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		</div>
 	{:else if currentStep === 1}
 		<!-- STEP 1: Seed material + Knowledge Graph -->
-		<div class="h-full overflow-hidden flex gap-6 p-6">
+		<div class="h-full overflow-y-auto md:overflow-hidden flex flex-col md:flex-row gap-4 md:gap-6 p-4 md:p-6">
 			<!-- seed side -->
-			<div class="w-96 flex-shrink-0 flex flex-col gap-3 overflow-y-auto">
+			<div class="flex flex-col gap-3 md:w-96 md:flex-shrink-0 md:overflow-y-auto">
 				<h2 class="text-base font-semibold mb-2">Seed Material</h2>
 				<p class="text-sm text-muted-foreground">Pick a template or paste your own.</p>
 				<div class="flex flex-wrap gap-2">
@@ -596,7 +596,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 					<Textarea
 						bind:value={seedText}
 						placeholder="Paste the article, document, or data..."
-						rows={8}
+						rows={6}
 					/>
 				</label>
 
@@ -617,7 +617,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 				</Button>
 
 				{#if graphNodes.length > 0}
-					<div class="flex gap-2 mt-4">
+					<div class="flex gap-2 mt-2">
 						<Button onclick={() => (currentStep = 2)}>
 							Next: Generate Agents
 						</Button>
@@ -626,7 +626,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 			</div>
 
 			<!-- graph side -->
-			<div class="flex-1 overflow-y-auto">
+			<div class="flex-1 md:overflow-y-auto">
 				{#if graphNodes.length === 0 && !graphLoading}
 					<div class="text-muted-foreground text-sm text-center py-8">Knowledge graph will appear here after extraction.</div>
 				{:else if graphLoading}
@@ -1101,6 +1101,22 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		</div>
 	{/if}
 </main>
+
+<!-- Bottom tab nav (mobile only) -->
+<nav class="flex md:hidden border-t border-border bg-background flex-shrink-0">
+	{#each steps as step}
+		<button
+			class="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 cursor-pointer transition-colors"
+			class:text-primary={currentStep === step.num}
+			class:text-success={stepHasData[step.num] && currentStep !== step.num}
+			class:text-muted-foreground={!stepHasData[step.num] && currentStep !== step.num}
+			onclick={() => (currentStep = step.num)}
+		>
+			<span class="text-sm font-bold leading-none">{step.num}</span>
+			<span class="text-[10px] font-medium">{step.label}</span>
+		</button>
+	{/each}
+</nav>
 
 <style>
 	/* Action items */

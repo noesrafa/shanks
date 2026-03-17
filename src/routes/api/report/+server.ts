@@ -46,37 +46,55 @@ export const POST: RequestHandler = async ({ request }) => {
 			.leftJoin(graphNodes, eq(agents.nodeId, graphNodes.id))
 			.where(eq(agents.projectId, projectId));
 
-		// All posts with author names
-		const allPosts = await db
-			.select({
-				id: posts.id,
-				content: posts.content,
-				numLikes: posts.numLikes,
-				userName: users.name
-			})
-			.from(posts)
-			.innerJoin(users, eq(posts.userId, users.id))
-			.orderBy(desc(posts.numLikes))
-			.limit(50);
+		// Get user IDs belonging to this project (via agents)
+		const projectUserIds = agentList.length > 0
+			? (await db
+				.select({ userId: agents.userId })
+				.from(agents)
+				.where(eq(agents.projectId, projectId))
+			).map(a => a.userId)
+			: [];
 
-		// All comments with author names
-		const allComments = await db
-			.select({
-				content: comments.content,
-				userName: users.name,
-				postId: comments.postId
-			})
-			.from(comments)
-			.innerJoin(users, eq(comments.userId, users.id))
-			.limit(80);
+		// All posts with author names (filtered by project users)
+		const allPosts = projectUserIds.length > 0
+			? await db
+				.select({
+					id: posts.id,
+					content: posts.content,
+					numLikes: posts.numLikes,
+					userName: users.name
+				})
+				.from(posts)
+				.innerJoin(users, eq(posts.userId, users.id))
+				.where(sql`${posts.userId} IN (${sql.join(projectUserIds.map(id => sql`${id}`), sql`, `)})`)
+				.orderBy(desc(posts.numLikes))
+				.limit(50)
+			: [];
 
-		// Follow relationships
-		const allFollows = await db.execute(sql`
-			SELECT f1.name as follower, f2.name as following
-			FROM shanks.follows fo
-			JOIN shanks.users f1 ON fo.follower_id = f1.id
-			JOIN shanks.users f2 ON fo.followee_id = f2.id
-		`);
+		// All comments with author names (filtered by project users)
+		const allComments = projectUserIds.length > 0
+			? await db
+				.select({
+					content: comments.content,
+					userName: users.name,
+					postId: comments.postId
+				})
+				.from(comments)
+				.innerJoin(users, eq(comments.userId, users.id))
+				.where(sql`${comments.userId} IN (${sql.join(projectUserIds.map(id => sql`${id}`), sql`, `)})`)
+				.limit(80)
+			: [];
+
+		// Follow relationships (filtered by project users)
+		const allFollows = projectUserIds.length > 0
+			? await db.execute(sql`
+				SELECT f1.name as follower, f2.name as following
+				FROM shanks.follows fo
+				JOIN shanks.users f1 ON fo.follower_id = f1.id
+				JOIN shanks.users f2 ON fo.followee_id = f2.id
+				WHERE fo.follower_id IN (${sql.join(projectUserIds.map(id => sql`${id}`), sql`, `)})
+			`)
+			: [];
 
 		// Top liked posts
 		const topPosts = allPosts.filter((p) => p.numLikes > 0).slice(0, 10);
