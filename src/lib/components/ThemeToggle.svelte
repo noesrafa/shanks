@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { themeStore, type Theme } from '$lib/stores/theme';
+	import { themeStore, type Theme } from '$lib/stores/theme.svelte';
 	import { cn } from '$lib/utils';
 
 	const options: { value: Theme; label: string; icon: string }[] = [
