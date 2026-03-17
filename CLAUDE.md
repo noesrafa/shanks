@@ -23,6 +23,12 @@ No inventes mecánicas que no existan en OASIS o MiroFish sin preguntar primero.
 - Crear tablas via psql, nunca via migraciones automáticas
 - psql: /opt/homebrew/Cellar/libpq/18.3/bin/psql "postgresql://supabase_admin.87608c9a427eefa1:...@db.soyrafa.dev:5432/postgres"
 
+## Git
+- SIEMPRE commitea y pushea TODOS los archivos que modifiques, sin excepción
+- Nunca dejes cambios sin commitear — el próximo pull o deploy los sobreescribe
+- Trabaja directamente en /projects/shanks, NO clones a /tmp/
+- Haz commits atómicos y descriptivos
+
 ## Principios
 - Fiel a OASIS + MiroFish: adaptar, no inventar
 - Incremental: un sprint a la vez
