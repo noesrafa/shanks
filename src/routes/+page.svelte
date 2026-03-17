@@ -1,4 +1,11 @@
 <script lang="ts">
+	import Button from '$lib/components/ui/button.svelte';
+	import Card from '$lib/components/ui/card.svelte';
+	import Input from '$lib/components/ui/input.svelte';
+	import Textarea from '$lib/components/ui/textarea.svelte';
+	import Badge from '$lib/components/ui/badge.svelte';
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+
 	// --- Types ---
 	interface Comment {
 		id: number;
@@ -535,138 +542,143 @@ The National Labor Relations Board received a surge of complaints about retaliat
 </script>
 
 <!-- Top bar -->
-<header class="topbar">
-	<div class="brand">SHANKS</div>
-	<nav class="steps">
+<header class="flex items-center px-5 h-12 border-b border-border bg-background flex-shrink-0">
+	<div class="font-black text-sm tracking-widest mr-8 text-foreground">SHANKS</div>
+	<nav class="flex gap-1">
 		{#each steps as step}
 			<button
-				class="step"
-				class:active={currentStep === step.num}
-				class:done={stepHasData[step.num]}
+				class="inline-flex items-center gap-1.5 border border-border text-muted-foreground px-3.5 py-1.5 rounded-md text-[11px] font-medium cursor-pointer transition-colors hover:border-muted-foreground hover:text-foreground"
+				class:bg-primary={currentStep === step.num}
+				class:border-primary={currentStep === step.num}
+				class:text-white={currentStep === step.num}
+				class:border-success={stepHasData[step.num] && currentStep !== step.num}
+				class:text-success={stepHasData[step.num] && currentStep !== step.num}
 				onclick={() => (currentStep = step.num)}
 			>
-				<span class="step-num">{step.num}</span>
+				<span class="font-bold text-[10px]">{step.num}</span>
 				{step.label}
 			</button>
 		{/each}
 	</nav>
-	<div class="spacer"></div>
+	<div class="flex-1"></div>
+	<ThemeToggle />
 	{#if projectId}
-		<button class="new-project-btn" onclick={resetState}>New Project</button>
+		<Button variant="secondary" size="sm" class="ml-2" onclick={resetState}>New Project</Button>
 	{/if}
 </header>
 
 <!-- Main content -->
-<main class="content">
+<main class="flex-1 overflow-hidden">
 	{#if initialLoading}
-		<div class="step-panel" style="display:flex;align-items:center;justify-content:center;">
-			<div class="empty">Loading project...</div>
+		<div class="h-full overflow-y-auto p-6 flex items-center justify-center">
+			<div class="text-muted-foreground text-sm text-center py-8">Loading project...</div>
 		</div>
 	{:else if initialError}
-		<div class="step-panel" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
-			<div class="error" style="margin:0;">{initialError}</div>
-			<button class="primary" onclick={resetState}>Start Fresh</button>
+		<div class="h-full overflow-y-auto p-6 flex flex-col items-center justify-center gap-4">
+			<div class="text-destructive text-sm">{initialError}</div>
+			<Button onclick={resetState}>Start Fresh</Button>
 		</div>
 	{:else if currentStep === 1}
 		<!-- STEP 1: Seed material + Knowledge Graph -->
-		<div class="step-panel graph-layout">
-			<div class="seed-side">
-				<h2>Seed Material</h2>
-				<p class="hint">Pick a template or paste your own.</p>
-				<div class="template-btns">
+		<div class="h-full overflow-hidden flex gap-6 p-6">
+			<!-- seed side -->
+			<div class="w-96 flex-shrink-0 flex flex-col gap-3 overflow-y-auto">
+				<h2 class="text-base font-semibold mb-2">Seed Material</h2>
+				<p class="text-sm text-muted-foreground">Pick a template or paste your own.</p>
+				<div class="flex flex-wrap gap-2">
 					{#each templates as tpl, i}
-						<button class="template-btn" onclick={() => loadTemplate(i)}>{tpl.name}</button>
+						<Button variant="outline" size="sm" onclick={() => loadTemplate(i)}>{tpl.name}</Button>
 					{/each}
 				</div>
 
-				<label>
+				<label class="flex flex-col gap-1 text-xs text-muted-foreground font-medium">
 					Source text
-					<textarea
+					<Textarea
 						bind:value={seedText}
 						placeholder="Paste the article, document, or data..."
-						rows="8"
-					></textarea>
+						rows={8}
+					/>
 				</label>
 
-				<label>
+				<label class="flex flex-col gap-1 text-xs text-muted-foreground font-medium">
 					Prediction question
-					<input
-						type="text"
+					<Input
 						bind:value={requirement}
 						placeholder="e.g. How will the public react to this policy change?"
 					/>
 				</label>
 
 				{#if graphError}
-					<div class="error">{graphError}</div>
+					<div class="text-destructive text-sm">{graphError}</div>
 				{/if}
 
-				<button class="primary full-width" onclick={buildGraph} disabled={graphLoading || !seedText || !requirement}>
+				<Button class="w-full" onclick={buildGraph} disabled={graphLoading || !seedText || !requirement}>
 					{graphLoading ? 'Extracting...' : 'Build Knowledge Graph'}
-				</button>
+				</Button>
 
 				{#if graphNodes.length > 0}
-					<div class="step-actions">
-						<button class="primary" onclick={() => (currentStep = 2)}>
+					<div class="flex gap-2 mt-4">
+						<Button onclick={() => (currentStep = 2)}>
 							Next: Generate Agents
-						</button>
+						</Button>
 					</div>
 				{/if}
 			</div>
 
-			<div class="graph-side">
+			<!-- graph side -->
+			<div class="flex-1 overflow-y-auto">
 				{#if graphNodes.length === 0 && !graphLoading}
-					<div class="empty">Knowledge graph will appear here after extraction.</div>
+					<div class="text-muted-foreground text-sm text-center py-8">Knowledge graph will appear here after extraction.</div>
 				{:else if graphLoading}
-					<div class="empty">Extracting entities and relationships...</div>
+					<div class="text-muted-foreground text-sm text-center py-8">Extracting entities and relationships...</div>
 				{:else}
-					<div class="graph-stats">
-						<div class="stat">
-							<span class="stat-num">{graphNodes.length}</span>
-							<span class="stat-label">Entities</span>
+					<div class="flex gap-6 mb-4">
+						<div class="flex flex-col">
+							<span class="text-2xl font-bold">{graphNodes.length}</span>
+							<span class="text-xs text-muted-foreground">Entities</span>
 						</div>
-						<div class="stat">
-							<span class="stat-num">{graphEdges.length}</span>
-							<span class="stat-label">Relationships</span>
+						<div class="flex flex-col">
+							<span class="text-2xl font-bold">{graphEdges.length}</span>
+							<span class="text-xs text-muted-foreground">Relationships</span>
 						</div>
-						<div class="stat">
-							<span class="stat-num">{ontology?.entities?.length || 0}</span>
-							<span class="stat-label">Entity types</span>
+						<div class="flex flex-col">
+							<span class="text-2xl font-bold">{ontology?.entities?.length || 0}</span>
+							<span class="text-xs text-muted-foreground">Entity types</span>
 						</div>
 					</div>
 
 					{#if ontology}
-						<h3>Entity Types</h3>
-						<div class="type-chips">
+						<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Entity Types</h3>
+						<div class="flex flex-wrap gap-2 mb-4">
 							{#each ontology.entities as etype}
-								<span class="type-chip" title={etype.description}>{etype.type}</span>
+								<span title={etype.description}><Badge variant="secondary">{etype.type}</Badge></span>
 							{/each}
 						</div>
 					{/if}
 
-					<h3>Entities</h3>
-					<div class="entity-list">
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Entities</h3>
+					<div class="flex flex-col gap-2">
 						{#each graphNodes as node}
-							<div class="entity-item">
-								<div class="entity-head">
+							<div class="rounded-lg border border-border p-3">
+								<div class="flex items-center gap-2 mb-1">
 									<strong>{node.name}</strong>
-									<span class="entity-type">{node.entityType}</span>
+									<Badge variant="outline">{node.entityType}</Badge>
 								</div>
-								<div class="entity-summary">{node.summary}</div>
+								<div class="text-xs text-muted-foreground">{node.summary}</div>
 							</div>
 						{/each}
 					</div>
 
 					{#if graphEdges.length > 0}
-						<h3>Relationships</h3>
-						<div class="edge-list">
+						<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 mt-4">Relationships</h3>
+						<div class="flex flex-col gap-1.5">
 							{#each graphEdges as edge}
 								{@const source = graphNodes.find((n) => n.id === edge.sourceNodeId)}
 								{@const target = graphNodes.find((n) => n.id === edge.targetNodeId)}
-								<div class="edge-item">
-									<span class="edge-node">{source?.name ?? '?'}</span>
-									<span class="edge-rel">{edge.edgeType}</span>
-									<span class="edge-node">{target?.name ?? '?'}</span>
+								<div class="flex items-center gap-2 text-sm">
+									<span class="text-foreground font-medium text-xs">{source?.name ?? '?'}</span>
+									<span class="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{edge.edgeType}</span>
+									<span class="text-foreground font-medium text-xs">{target?.name ?? '?'}</span>
 								</div>
 							{/each}
 						</div>
@@ -677,106 +689,112 @@ The National Labor Relations Board received a surge of complaints about retaliat
 
 	{:else if currentStep === 2}
 		<!-- STEP 2: Agents (generated from graph, like MiroFish environment setup) -->
-		<div class="step-panel">
-			<div class="agents-header">
-				<h2>Agents</h2>
-				<div class="agent-stats">
-					<div class="stat">
-						<span class="stat-num">{generatedAgents.length}</span>
-						<span class="stat-label">Agents</span>
+		<div class="h-full overflow-y-auto p-6">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-base font-semibold mb-2">Agents</h2>
+				<div class="flex gap-4">
+					<div class="flex flex-col">
+						<span class="text-2xl font-bold">{generatedAgents.length}</span>
+						<span class="text-xs text-muted-foreground">Agents</span>
 					</div>
-					<div class="stat">
-						<span class="stat-num">{graphNodes.length}</span>
-						<span class="stat-label">Entities</span>
+					<div class="flex flex-col">
+						<span class="text-2xl font-bold">{graphNodes.length}</span>
+						<span class="text-xs text-muted-foreground">Entities</span>
 					</div>
-					<div class="stat">
-						<span class="stat-num">5</span>
-						<span class="stat-label">Actions</span>
+					<div class="flex flex-col">
+						<span class="text-2xl font-bold">5</span>
+						<span class="text-xs text-muted-foreground">Actions</span>
 					</div>
 				</div>
 			</div>
 
 			{#if generatedAgents.length === 0}
 				{#if agentsError}
-					<div class="error">{agentsError}</div>
+					<div class="text-destructive text-sm">{agentsError}</div>
 				{/if}
 
 				{#if projectId === 0}
-					<div class="empty">Build a knowledge graph in Step 1 first.</div>
+					<div class="text-muted-foreground text-sm text-center py-8">Build a knowledge graph in Step 1 first.</div>
 				{:else}
-					<p class="hint">Generate agent personas from the {graphNodes.length} entities extracted in Step 1. Each entity becomes an agent with personality, stance, and behavior.</p>
-					<button class="primary" onclick={generateAgents} disabled={agentsLoading || !projectId}>
+					<p class="text-sm text-muted-foreground">Generate agent personas from the {graphNodes.length} entities extracted in Step 1. Each entity becomes an agent with personality, stance, and behavior.</p>
+					<Button class="mt-3" onclick={generateAgents} disabled={agentsLoading || !projectId}>
 						{agentsLoading ? (agentsProgress || 'Generating...') : `Generate ${graphNodes.length} Agents`}
-					</button>
+					</Button>
 				{/if}
 			{:else}
-				<div class="agents-grid">
+				<div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))">
 					{#each generatedAgents as agent}
-						<div class="agent-card">
-							<div class="agent-head-row">
-								<div class="agent-name">{agent.name}</div>
-								<span class="entity-type">{agent.entityType}</span>
-								<span class="stance-chip" class:supportive={agent.stance === 'supportive'} class:opposing={agent.stance === 'opposing'} class:observer={agent.stance === 'observer'}>{agent.stance}</span>
+						<Card class="p-4 flex flex-col gap-2">
+							<div class="flex items-center gap-2 flex-wrap">
+								<div class="font-semibold text-sm flex-1">{agent.name}</div>
+								<Badge variant="outline">{agent.entityType}</Badge>
+								{#if agent.stance === 'supportive'}
+									<Badge variant="success">{agent.stance}</Badge>
+								{:else if agent.stance === 'opposing'}
+									<Badge variant="destructive">{agent.stance}</Badge>
+								{:else}
+									<Badge variant="secondary">{agent.stance}</Badge>
+								{/if}
 							</div>
-							<div class="agent-bio">{agent.bio}</div>
-							<div class="agent-persona">{agent.persona}</div>
-							<div class="agent-meta">
+							<div class="text-xs text-muted-foreground">{agent.bio}</div>
+							<div class="text-xs">{agent.persona}</div>
+							<div class="text-xs text-muted-foreground">
 								<span>Activity: {Math.round(agent.activityLevel * 100)}%</span>
 							</div>
-							<div class="agent-tags">
+							<div class="flex flex-wrap gap-1">
 								{#each (typeof agent.interests === 'string' ? agent.interests.split(',') : agent.interests) as tag}
-									<span class="tag">{tag.trim()}</span>
+									<Badge variant="secondary" class="text-[10px]">{tag.trim()}</Badge>
 								{/each}
 							</div>
-						</div>
+						</Card>
 					{/each}
 				</div>
 
-				<div class="step-actions">
-					<button class="secondary" onclick={() => (currentStep = 1)}>Back</button>
-					<button class="primary" onclick={() => (currentStep = 3)}>Next: Simulate</button>
+				<div class="flex gap-2 mt-4">
+					<Button variant="secondary" onclick={() => (currentStep = 1)}>Back</Button>
+					<Button onclick={() => (currentStep = 3)}>Next: Simulate</Button>
 				</div>
 			{/if}
 		</div>
 
 	{:else if currentStep === 3}
 		<!-- STEP 3: Simulation with timeline -->
-		<div class="step-panel sim-layout">
-			<div class="sim-sidebar">
-				<h3>Controls</h3>
+		<div class="flex h-full overflow-hidden">
+			<div class="w-60 border-r border-border p-4 overflow-y-auto flex-shrink-0 flex flex-col gap-3">
+				<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Controls</h3>
 				{#if !seeded && totalRounds === 0}
-					<button
-						class="secondary full-width"
+					<Button
+						variant="secondary"
+						class="w-full"
 						onclick={generateSeedPosts}
 						disabled={seedLoading || !projectId}
-						title="Generate initial posts from agent personas to kick off the conversation"
 					>
 						{seedLoading ? 'Seeding...' : 'Seed posts'}
-					</button>
+					</Button>
 				{/if}
 
-				<button class="primary full-width" onclick={simulate} disabled={loading || !projectId} style="margin-top: 0.5rem;">
+				<Button class="w-full" onclick={simulate} disabled={loading || !projectId}>
 					{loading ? 'Running...' : `Run round ${totalRounds + 1}`}
-				</button>
+				</Button>
 
-				<div class="sim-stats">
-					<div class="stat-row">
+				<div class="flex flex-col gap-1.5 rounded-lg border border-border p-3">
+					<div class="flex justify-between items-center text-xs">
 						<span>Rounds</span>
 						<strong>{totalRounds}</strong>
 					</div>
-					<div class="stat-row">
+					<div class="flex justify-between items-center text-xs">
 						<span>Posts</span>
 						<strong>{displayPosts.length}</strong>
 					</div>
-					<div class="stat-row">
+					<div class="flex justify-between items-center text-xs">
 						<span>Agents</span>
 						<strong>{agents.length}</strong>
 					</div>
 				</div>
 
 				{#if totalRounds > 0}
-					<h3>Timeline</h3>
-					<div class="timeline">
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Timeline</h3>
+					<div class="flex flex-col gap-1">
 						<input
 							type="range"
 							min="1"
@@ -785,9 +803,9 @@ The National Labor Relations Board received a surge of complaints about retaliat
 							oninput={onSliderChange}
 							class="slider"
 						/>
-						<div class="timeline-labels">
+						<div class="flex justify-between text-[10px] text-muted-foreground">
 							<span>Round 1</span>
-							<span class="timeline-current">
+							<span class="font-medium text-foreground">
 								{#if isLive}
 									Round {totalRounds} (live)
 								{:else}
@@ -797,18 +815,25 @@ The National Labor Relations Board received a surge of complaints about retaliat
 							<span>Round {totalRounds}</span>
 						</div>
 						{#if !isLive}
-							<button class="live-btn" onclick={() => (viewingRound = 0)}>
+							<Button variant="ghost" size="sm" class="w-full" onclick={() => (viewingRound = 0)}>
 								Jump to live
-							</button>
+							</Button>
 						{/if}
 					</div>
 				{/if}
 
 				{#if displayActions.length > 0}
-					<h3>Round {displayRound} log</h3>
-					<div class="action-list">
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Round {displayRound} log</h3>
+					<div class="flex flex-col gap-1">
 						{#each displayActions as a}
-							<div class="action-item" class:like={a.action === 'like_post'} class:post={a.action === 'create_post'} class:comment={a.action === 'create_comment'} class:follow={a.action === 'follow'} class:nothing={a.action === 'do_nothing'}>
+							<div
+								class="action-item"
+								class:like={a.action === 'like_post'}
+								class:post={a.action === 'create_post'}
+								class:comment={a.action === 'create_comment'}
+								class:follow={a.action === 'follow'}
+								class:nothing={a.action === 'do_nothing'}
+							>
 								{actionLabel(a)}
 							</div>
 						{/each}
@@ -816,16 +841,15 @@ The National Labor Relations Board received a surge of complaints about retaliat
 				{/if}
 
 				{#if totalRounds > 1}
-					<h3>All rounds</h3>
-					<div class="rounds-list">
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">All rounds</h3>
+					<div class="flex flex-wrap gap-1">
 						{#each snapshots as snap}
 							<button
-								class="round-btn"
-								class:active={displayRound === snap.round}
+								class={`inline-flex items-center gap-1.5 border rounded px-2 py-1 text-[10px] cursor-pointer transition-colors ${displayRound === snap.round ? 'bg-primary/10 border-primary text-primary' : 'border-border text-muted-foreground hover:border-muted-foreground'}`}
 								onclick={() => (viewingRound = snap.round)}
 							>
-								<span class="round-num">R{snap.round}</span>
-								<span class="round-summary">
+								<span class="font-bold">R{snap.round}</span>
+								<span>
 									{snap.actions.filter((a) => a.action === 'create_post').length}p
 									{snap.actions.filter((a) => a.action === 'like_post').length}l
 									{snap.actions.filter((a) => a.action === 'create_comment').length}c
@@ -837,98 +861,98 @@ The National Labor Relations Board received a surge of complaints about retaliat
 				{/if}
 			</div>
 
-			<div class="sim-feed">
+			<div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
 				{#if error}
-					<div class="error">{error}</div>
+					<div class="text-destructive text-sm">{error}</div>
 				{/if}
 
 				{#if !isLive && totalRounds > 0}
-					<div class="viewing-past">
+					<div class="text-xs text-muted-foreground text-center">
 						Viewing round {viewingRound} of {totalRounds}
 					</div>
 				{/if}
 
 				{#if displayPosts.length === 0 && seedPosts.length === 0}
-					<div class="empty">No posts yet. Seed posts to prime the feed, then run the first round.</div>
+					<div class="text-muted-foreground text-sm text-center py-8">No posts yet. Seed posts to prime the feed, then run the first round.</div>
 				{/if}
 
 				{#if seeded && totalRounds === 0 && seedPosts.length > 0}
-					<div class="seed-banner">Seed posts ready — {seedPosts.length} initial posts. Run round 1 to start.</div>
+					<div class="rounded-lg bg-success/10 text-success text-sm px-4 py-2">Seed posts ready — {seedPosts.length} initial posts. Run round 1 to start.</div>
 					{#each seedPosts as post}
-						<article class="post seed-post">
-							<div class="post-header">
+						<Card class="p-4 opacity-75">
+							<div class="flex items-center gap-2 mb-2">
 								<strong>{post.userName}</strong>
-								<span class="seed-label">seed</span>
+								<Badge variant="outline" class="text-[10px]">seed</Badge>
 							</div>
-							<p class="post-content">{post.content}</p>
-						</article>
+							<p class="text-sm">{post.content}</p>
+						</Card>
 					{/each}
 				{/if}
 
 				{#each displayPosts as post}
-					<article class="post">
-						<div class="post-header">
+					<Card class="p-4">
+						<div class="flex items-center gap-2 mb-2">
 							<strong>{post.userName}</strong>
-							<span class="bio">{post.userBio}</span>
+							<span class="text-xs text-muted-foreground truncate flex-1">{post.userBio}</span>
 						</div>
-						<p class="post-content">{post.content}</p>
-						<div class="post-footer">
+						<p class="text-sm">{post.content}</p>
+						<div class="flex items-center gap-4 text-xs text-muted-foreground mt-2">
 							{#if post.numLikes > 0}
-								<span class="likes">&hearts; {post.numLikes}</span>
+								<span class="text-pink-500">&hearts; {post.numLikes}</span>
 							{/if}
 							<time>{new Date(post.createdAt).toLocaleString()}</time>
 						</div>
 
 						{#if post.comments && post.comments.length > 0}
-							<div class="comments">
+							<div class="mt-3 border-t border-border pt-3 flex flex-col gap-2">
 								{#each post.comments as comment}
-									<div class="comment">
+									<div class="flex items-start gap-2 text-xs">
 										<strong>{comment.userName}</strong>
 										<span>{comment.content}</span>
 									</div>
 								{/each}
 							</div>
 						{/if}
-					</article>
+					</Card>
 				{/each}
 			</div>
 		</div>
 
 	{:else if currentStep === 4}
 		<!-- STEP 4: Prediction Report -->
-		<div class="step-panel report-layout">
-			<div class="report-sidebar">
-				<h3>Report</h3>
+		<div class="flex h-full overflow-hidden">
+			<div class="w-80 border-r border-border p-4 overflow-y-auto flex-shrink-0 flex flex-col gap-3">
+				<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Report</h3>
 
 				{#if projectId === 0}
-					<div class="empty">Run the full pipeline first (Steps 1-3).</div>
+					<div class="text-muted-foreground text-sm text-center py-8">Run the full pipeline first (Steps 1-3).</div>
 				{:else if !report}
-					<p class="hint">Analyze the simulation results and generate a prediction report.</p>
+					<p class="text-sm text-muted-foreground">Analyze the simulation results and generate a prediction report.</p>
 
 					{#if reportError}
-						<div class="error">{reportError}</div>
+						<div class="text-destructive text-sm">{reportError}</div>
 					{/if}
 
-					<button class="primary full-width" onclick={generateReport} disabled={reportLoading}>
+					<Button class="w-full" onclick={generateReport} disabled={reportLoading}>
 						{reportLoading ? 'Analyzing...' : 'Generate Prediction Report'}
-					</button>
+					</Button>
 				{:else}
-					<h3>Stats</h3>
+					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Stats</h3>
 					{#if reportStats}
-						<div class="sim-stats">
-							<div class="stat-row"><span>Agents</span><strong>{reportStats.agents}</strong></div>
-							<div class="stat-row"><span>Posts</span><strong>{reportStats.posts}</strong></div>
-							<div class="stat-row"><span>Comments</span><strong>{reportStats.comments}</strong></div>
-							<div class="stat-row"><span>Follows</span><strong>{reportStats.follows}</strong></div>
+						<div class="flex flex-col gap-1.5 rounded-lg border border-border p-3">
+							<div class="flex justify-between items-center text-xs"><span>Agents</span><strong>{reportStats.agents}</strong></div>
+							<div class="flex justify-between items-center text-xs"><span>Posts</span><strong>{reportStats.posts}</strong></div>
+							<div class="flex justify-between items-center text-xs"><span>Comments</span><strong>{reportStats.comments}</strong></div>
+							<div class="flex justify-between items-center text-xs"><span>Follows</span><strong>{reportStats.follows}</strong></div>
 						</div>
 
 						{#if reportStats.stances}
-							<h3>Stance distribution</h3>
-							<div class="stance-bars">
+							<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Stance distribution</h3>
+							<div class="flex flex-col gap-2">
 								{#each Object.entries(reportStats.stances) as [stance, count]}
-									<div class="stance-row">
-										<span class="stance-label">{stance}</span>
-										<div class="stance-bar">
+									<div class="flex items-center gap-2">
+										<span class="text-xs w-20 text-muted-foreground">{stance}</span>
+										<div class="flex-1 h-2 bg-muted rounded-full overflow-hidden">
 											<div
 												class="stance-fill"
 												class:supportive={stance === 'supportive'}
@@ -938,23 +962,23 @@ The National Labor Relations Board received a surge of complaints about retaliat
 												style="width: {((count as number) / reportStats.agents) * 100}%"
 											></div>
 										</div>
-										<span class="stance-count">{count}</span>
+										<span class="text-xs text-muted-foreground w-6 text-right">{count}</span>
 									</div>
 								{/each}
 							</div>
 						{/if}
 					{/if}
 
-					<div class="step-actions">
-						<button class="secondary" onclick={() => { report = ''; }} >Regenerate</button>
-						<button class="primary" onclick={() => (currentStep = 5)}>Next: Chat</button>
+					<div class="flex gap-2 mt-4">
+						<Button variant="secondary" onclick={() => { report = ''; }}>Regenerate</Button>
+						<Button onclick={() => (currentStep = 5)}>Next: Chat</Button>
 					</div>
 				{/if}
 			</div>
 
-			<div class="report-content">
+			<div class="flex-1 overflow-y-auto p-6">
 				{#if reportLoading}
-					<div class="empty">Analyzing {reportStats?.posts || '...'} posts, {reportStats?.comments || '...'} comments, and {reportStats?.agents || '...'} agent behaviors...</div>
+					<div class="text-muted-foreground text-sm text-center py-8">Analyzing {reportStats?.posts || '...'} posts, {reportStats?.comments || '...'} comments, and {reportStats?.agents || '...'} agent behaviors...</div>
 				{:else if report}
 					<article class="markdown">
 						{@html report
@@ -968,43 +992,54 @@ The National Labor Relations Board received a surge of complaints about retaliat
 							.replace(/$/, '</p>')}
 					</article>
 				{:else}
-					<div class="empty">Generate a report to see the prediction analysis here.</div>
+					<div class="text-muted-foreground text-sm text-center py-8">Generate a report to see the prediction analysis here.</div>
 				{/if}
 			</div>
 		</div>
 
 	{:else if currentStep === 5}
 		<!-- STEP 5: Deep Interaction -->
-		<div class="step-panel chat-layout">
-			<div class="chat-sidebar">
-				<h3>Talk to</h3>
+		<div class="flex h-full overflow-hidden">
+			<div class="w-60 border-r border-border p-4 overflow-y-auto flex-shrink-0 flex flex-col gap-2">
+				<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Talk to</h3>
 
 				<button
-					class="chat-target"
-					class:active={chatMode === 'report'}
+					class="w-full text-left px-3 py-2 rounded-md border border-border text-sm cursor-pointer transition-colors hover:bg-accent"
+					class:bg-primary={chatMode === 'report'}
+					class:bg-opacity-10={chatMode === 'report'}
+					class:border-primary={chatMode === 'report'}
+					class:text-primary={chatMode === 'report'}
 					onclick={() => switchChatMode('report')}
 				>
-					<span class="chat-target-name">ReportAgent</span>
-					<span class="chat-target-desc">Ask about predictions</span>
+					<span class="block font-medium text-xs">ReportAgent</span>
+					<span class="block text-[10px] text-muted-foreground">Ask about predictions</span>
 				</button>
 
-				<h3>Interview agents</h3>
-				<div class="agent-list-chat">
+				<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Interview agents</h3>
+				<div class="flex flex-col gap-1">
 					{#each generatedAgents as a}
 						<button
-							class="chat-target"
-							class:active={chatMode === 'agent' && chatAgent === a.name}
+							class="w-full text-left px-3 py-2 rounded-md border border-border text-sm cursor-pointer transition-colors hover:bg-accent"
+							class:bg-primary={chatMode === 'agent' && chatAgent === a.name}
+							class:bg-opacity-10={chatMode === 'agent' && chatAgent === a.name}
+							class:border-primary={chatMode === 'agent' && chatAgent === a.name}
+							class:text-primary={chatMode === 'agent' && chatAgent === a.name}
 							onclick={() => switchChatMode('agent', a.name)}
 						>
-							<span class="chat-target-name">{a.name}</span>
-							<span class="chat-target-stance" class:supportive={a.stance === 'supportive'} class:opposing={a.stance === 'opposing'}>{a.stance}</span>
+							<span class="block font-medium text-xs">{a.name}</span>
+							<span
+								class="block text-[10px]"
+								class:text-success={a.stance === 'supportive'}
+								class:text-destructive={a.stance === 'opposing'}
+								class:text-muted-foreground={a.stance !== 'supportive' && a.stance !== 'opposing'}
+							>{a.stance}</span>
 						</button>
 					{/each}
 				</div>
 			</div>
 
-			<div class="chat-main">
-				<div class="chat-header">
+			<div class="flex-1 flex flex-col overflow-hidden">
+				<div class="px-4 py-3 border-b border-border text-sm flex-shrink-0">
 					{#if chatMode === 'report'}
 						Chatting with <strong>ReportAgent</strong>
 					{:else}
@@ -1012,9 +1047,9 @@ The National Labor Relations Board received a surge of complaints about retaliat
 					{/if}
 				</div>
 
-				<div class="chat-messages" bind:this={chatMessagesEl}>
+				<div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3" bind:this={chatMessagesEl}>
 					{#if chatHistory.length === 0}
-						<div class="empty">
+						<div class="text-muted-foreground text-sm text-center py-8">
 							{#if chatMode === 'report'}
 								Ask the ReportAgent about its predictions, methodology, or specific agents.
 							{:else}
@@ -1024,29 +1059,43 @@ The National Labor Relations Board received a surge of complaints about retaliat
 					{/if}
 
 					{#each chatHistory as msg}
-						<div class="chat-msg" class:user={msg.role === 'user'} class:assistant={msg.role === 'assistant'}>
-							<div class="chat-msg-label">{msg.role === 'user' ? 'You' : chatMode === 'report' ? 'ReportAgent' : chatAgent}</div>
-							<div class="chat-msg-content">{msg.content}</div>
+						<div
+							class="flex flex-col gap-1"
+							class:items-end={msg.role === 'user'}
+							class:items-start={msg.role === 'assistant'}
+						>
+							<div
+								class="text-[10px] text-muted-foreground px-1"
+								class:text-right={msg.role === 'user'}
+							>{msg.role === 'user' ? 'You' : chatMode === 'report' ? 'ReportAgent' : chatAgent}</div>
+							<div
+								class="rounded-lg px-3 py-2 text-sm max-w-xl"
+								class:bg-primary={msg.role === 'user'}
+								class:text-primary-foreground={msg.role === 'user'}
+								class:bg-card={msg.role === 'assistant'}
+								class:border={msg.role === 'assistant'}
+								class:border-border={msg.role === 'assistant'}
+							>{msg.content}</div>
 						</div>
 					{/each}
 
 					{#if chatLoading}
-						<div class="chat-msg assistant">
-							<div class="chat-msg-label">{chatMode === 'report' ? 'ReportAgent' : chatAgent}</div>
-							<div class="chat-msg-content typing">Thinking...</div>
+						<div class="flex flex-col gap-1 items-start">
+							<div class="text-[10px] text-muted-foreground px-1">{chatMode === 'report' ? 'ReportAgent' : chatAgent}</div>
+							<div class="rounded-lg px-3 py-2 text-sm max-w-xl bg-card border border-border typing">Thinking...</div>
 						</div>
 					{/if}
 				</div>
 
-				<div class="chat-input-row">
-					<input
-						type="text"
+				<div class="flex gap-2 p-4 border-t border-border flex-shrink-0">
+					<Input
 						bind:value={chatInput}
 						placeholder={chatMode === 'report' ? 'Ask about the prediction...' : `Ask ${chatAgent} a question...`}
 						onkeydown={(e) => e.key === 'Enter' && sendChat()}
 						disabled={chatLoading}
+						class="flex-1"
 					/>
-					<button class="primary" onclick={sendChat} disabled={chatLoading || !chatInput.trim()}>Send</button>
+					<Button onclick={sendChat} disabled={chatLoading || !chatInput.trim()}>Send</Button>
 				</div>
 			</div>
 		</div>
@@ -1054,1015 +1103,42 @@ The National Labor Relations Board received a surge of complaints about retaliat
 </main>
 
 <style>
-	/* --- Top bar --- */
-	.topbar {
-		display: flex;
-		align-items: center;
-		padding: 0 20px;
-		height: 48px;
-		border-bottom: 1px solid #2f3336;
-		flex-shrink: 0;
-	}
-
-	.brand {
-		font-weight: 800;
-		font-size: 16px;
-		letter-spacing: 1px;
-		margin-right: 32px;
-	}
-
-	.steps {
-		display: flex;
-		gap: 4px;
-	}
-
-	.step {
-		background: none;
-		border: 1px solid #2f3336;
-		color: #71767b;
-		padding: 6px 14px;
-		border-radius: 6px;
-		font-size: 13px;
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		gap: 6px;
-	}
-
-	.step:hover {
-		border-color: #536471;
-		color: #e7e9ea;
-	}
-
-	.step.active {
-		background: #1d9bf0;
-		border-color: #1d9bf0;
-		color: white;
-	}
-
-	.step.done {
-		border-color: #00ba7c;
-		color: #00ba7c;
-	}
-
-	.step-num {
-		font-weight: 700;
-		font-size: 11px;
-	}
-
-	.spacer {
-		flex: 1;
-	}
-
-	.new-project-btn {
-		background: none;
-		border: 1px solid #2f3336;
-		color: #e7e9ea;
-		padding: 6px 14px;
-		border-radius: 6px;
-		font-size: 13px;
-		cursor: pointer;
-		font-weight: 600;
-	}
-
-	.new-project-btn:hover {
-		border-color: #f91880;
-		color: #f91880;
-	}
-
-	/* --- Main content --- */
-	.content {
-		flex: 1;
-		overflow: hidden;
-	}
-
-	.step-panel {
-		height: 100%;
-		overflow-y: auto;
-		padding: 24px;
-	}
-
-	.step-panel.centered {
-		display: flex;
-		justify-content: center;
-		padding-top: 60px;
-	}
-
-	/* --- Step 1: Graph layout --- */
-	.graph-layout {
-		display: flex;
-		gap: 0;
-		padding: 0;
-	}
-
-	.seed-side {
-		width: 380px;
-		flex-shrink: 0;
-		padding: 24px;
-		border-right: 1px solid #2f3336;
-		overflow-y: auto;
-	}
-
-	.seed-side h2 {
-		margin: 0 0 8px;
-		font-size: 20px;
-	}
-
-	.template-btns {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-		margin-bottom: 16px;
-	}
-
-	.template-btn {
-		background: #16181c;
-		border: 1px solid #2f3336;
-		color: #e7e9ea;
-		padding: 6px 12px;
-		border-radius: 6px;
-		font-size: 12px;
-		cursor: pointer;
-	}
-
-	.template-btn:hover {
-		border-color: #1d9bf0;
-		color: #1d9bf0;
-	}
-
-	.graph-side {
-		flex: 1;
-		padding: 24px;
-		overflow-y: auto;
-	}
-
-	.graph-side h3 {
-		margin: 20px 0 10px;
-		font-size: 14px;
-		color: #71767b;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-
-	.graph-stats {
-		display: flex;
-		gap: 32px;
-		padding-bottom: 16px;
-		border-bottom: 1px solid #2f3336;
-	}
-
-	.type-chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-	}
-
-	.type-chip {
-		background: #2a1a3a;
-		color: #a970ff;
-		padding: 4px 12px;
-		border-radius: 12px;
-		font-size: 12px;
-		cursor: help;
-	}
-
-	.entity-list {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-
-	.entity-item {
-		background: #16181c;
-		border: 1px solid #2f3336;
-		border-radius: 8px;
-		padding: 12px;
-	}
-
-	.entity-head {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin-bottom: 4px;
-	}
-
-	.entity-head strong {
-		font-size: 14px;
-	}
-
-	.entity-type {
-		background: #1d3a5c;
-		color: #1d9bf0;
-		padding: 1px 8px;
-		border-radius: 10px;
-		font-size: 11px;
-	}
-
-	.entity-summary {
-		color: #71767b;
-		font-size: 13px;
-		line-height: 1.3;
-	}
-
-	.edge-list {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-	}
-
-	.edge-item {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 8px 12px;
-		background: #16181c;
-		border-radius: 6px;
-		font-size: 13px;
-	}
-
-	.edge-node {
-		color: #e7e9ea;
-		font-weight: 600;
-	}
-
-	.edge-rel {
-		color: #00ba7c;
-		font-size: 12px;
-		background: #1a3a2a;
-		padding: 2px 8px;
-		border-radius: 10px;
-	}
-
-	.hint {
-		color: #71767b;
-		font-size: 14px;
-		margin: 0 0 24px;
-		line-height: 1.4;
-	}
-
-	label {
-		display: block;
-		margin-bottom: 16px;
-		font-size: 13px;
-		color: #71767b;
-		font-weight: 600;
-	}
-
-	textarea,
-	input[type='text'] {
-		display: block;
-		width: 100%;
-		margin-top: 6px;
-		padding: 12px;
-		background: #16181c;
-		border: 1px solid #2f3336;
-		border-radius: 8px;
-		color: #e7e9ea;
-		font-size: 14px;
-		font-family: inherit;
-		resize: vertical;
-	}
-
-	textarea:focus,
-	input[type='text']:focus {
-		outline: none;
-		border-color: #1d9bf0;
-	}
-
-	/* --- Buttons --- */
-	.primary {
-		background: #1d9bf0;
-		color: white;
-		border: none;
-		padding: 10px 24px;
-		border-radius: 8px;
-		font-size: 14px;
-		font-weight: 700;
-		cursor: pointer;
-	}
-
-	.primary:hover:not(:disabled) {
-		background: #1a8cd8;
-	}
-
-	.primary:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.secondary {
-		background: none;
-		color: #e7e9ea;
-		border: 1px solid #2f3336;
-		padding: 10px 24px;
-		border-radius: 8px;
-		font-size: 14px;
-		font-weight: 600;
-		cursor: pointer;
-	}
-
-	.secondary:hover {
-		border-color: #536471;
-	}
-
-	.full-width {
-		width: 100%;
-	}
-
-	.step-actions {
-		display: flex;
-		gap: 12px;
-		margin-top: 24px;
-	}
-
-	/* --- Step 2: Agents --- */
-	.agents-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		margin-bottom: 20px;
-	}
-
-	.agents-header h2 {
-		margin: 0;
-		font-size: 20px;
-	}
-
-	.agent-stats {
-		display: flex;
-		gap: 24px;
-	}
-
-	.stat {
-		text-align: center;
-	}
-
-	.stat-num {
-		display: block;
-		font-size: 24px;
-		font-weight: 800;
-	}
-
-	.stat-label {
-		font-size: 12px;
-		color: #71767b;
-	}
-
-	.agents-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-		gap: 12px;
-	}
-
-	.agent-card {
-		background: #16181c;
-		border: 1px solid #2f3336;
-		border-radius: 10px;
-		padding: 16px;
-	}
-
-	.agent-head-row {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin-bottom: 6px;
-		flex-wrap: wrap;
-	}
-
-	.agent-name {
-		font-weight: 700;
-		font-size: 15px;
-	}
-
-	.agent-bio {
-		color: #71767b;
-		font-size: 13px;
-		margin-bottom: 6px;
-		line-height: 1.3;
-	}
-
-	.agent-persona {
-		color: #a0a4a8;
-		font-size: 12px;
-		line-height: 1.4;
-		margin-bottom: 8px;
-		border-left: 2px solid #2f3336;
-		padding-left: 10px;
-	}
-
-	.agent-meta {
-		font-size: 11px;
-		color: #71767b;
-		margin-bottom: 8px;
-	}
-
-	.stance-chip {
-		padding: 1px 8px;
-		border-radius: 10px;
-		font-size: 11px;
-		background: #2f3336;
-		color: #71767b;
-	}
-
-	.stance-chip.supportive {
-		background: #1a3a2a;
-		color: #00ba7c;
-	}
-
-	.stance-chip.opposing {
-		background: #3d1f2e;
-		color: #f91880;
-	}
-
-	.stance-chip.observer {
-		background: #1d3a5c;
-		color: #1d9bf0;
-	}
-
-	.agent-tags {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-	}
-
-	.tag {
-		background: #1d3a5c;
-		color: #1d9bf0;
-		padding: 2px 10px;
-		border-radius: 12px;
-		font-size: 12px;
-	}
-
-	/* --- Step 3: Simulation layout --- */
-	.sim-layout {
-		display: flex;
-		gap: 0;
-		padding: 0;
-	}
-
-	.sim-sidebar {
-		width: 260px;
-		flex-shrink: 0;
-		padding: 20px;
-		border-right: 1px solid #2f3336;
-		overflow-y: auto;
-	}
-
-	.sim-sidebar h3 {
-		margin: 0 0 12px;
-		font-size: 14px;
-		color: #71767b;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-
-	.sim-stats {
-		margin-top: 20px;
-		margin-bottom: 20px;
-	}
-
-	.stat-row {
-		display: flex;
-		justify-content: space-between;
-		padding: 8px 0;
-		font-size: 14px;
-		border-bottom: 1px solid #2f3336;
-	}
-
-	.stat-row span {
-		color: #71767b;
-	}
-
-	.action-list {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-	}
-
+	/* Action items */
 	.action-item {
-		padding: 6px 10px;
-		border-radius: 6px;
-		font-size: 12px;
-		background: #2f3336;
-		color: #71767b;
-	}
-
-	.action-item.post {
-		background: #1d3a5c;
-		color: #1d9bf0;
-	}
-
-	.action-item.like {
-		background: #3d1f2e;
-		color: #f91880;
-	}
-
-	.action-item.comment {
-		background: #1a3a2a;
-		color: #00ba7c;
-	}
-
-	.action-item.follow {
-		background: #2a1a3a;
-		color: #a970ff;
-	}
-
-	/* --- Timeline --- */
-	.timeline {
-		margin-bottom: 20px;
-	}
-
-	.slider {
-		width: 100%;
-		height: 4px;
-		appearance: none;
-		background: #2f3336;
-		border-radius: 2px;
-		outline: none;
-		cursor: pointer;
-	}
-
-	.slider::-webkit-slider-thumb {
-		appearance: none;
-		width: 16px;
-		height: 16px;
-		border-radius: 50%;
-		background: #1d9bf0;
-		cursor: pointer;
-	}
-
-	.timeline-labels {
-		display: flex;
-		justify-content: space-between;
 		font-size: 11px;
-		color: #71767b;
-		margin-top: 4px;
+		padding: 3px 8px 3px 10px;
+		border-left: 2px solid transparent;
+		color: var(--tw-color-muted-foreground, #71767b);
 	}
+	.action-item.post { border-color: hsl(var(--primary)); color: hsl(var(--foreground)); }
+	.action-item.like { border-color: hsl(var(--success)); }
+	.action-item.comment { border-color: #a970ff; }
+	.action-item.follow { border-color: hsl(var(--border)); }
+	.action-item.nothing { opacity: 0.4; }
 
-	.timeline-current {
-		color: #1d9bf0;
-		font-weight: 600;
-	}
+	/* Stance bars */
+	.stance-fill { height: 100%; border-radius: 9999px; background: hsl(var(--muted-foreground)); }
+	.stance-fill.supportive { background: hsl(var(--success)); }
+	.stance-fill.opposing { background: hsl(var(--destructive)); }
+	.stance-fill.neutral { background: hsl(var(--primary)); }
+	.stance-fill.observer { background: hsl(var(--muted-foreground)); }
 
-	.live-btn {
+	/* Markdown — :global needed because content is injected via {@html} */
+	.markdown { font-size: 13px; line-height: 1.7; }
+	:global(.markdown h2) { font-size: 16px; font-weight: 700; margin: 1.5em 0 0.5em; color: hsl(var(--foreground)); }
+	:global(.markdown h3) { font-size: 13px; font-weight: 700; margin: 1.2em 0 0.4em; color: hsl(var(--foreground)); }
+	:global(.markdown p) { margin: 0.7em 0; color: hsl(var(--foreground)); }
+	:global(.markdown blockquote) { border-left: 3px solid hsl(var(--border)); margin: 1em 0; padding: 0.5em 1em; color: hsl(var(--muted-foreground)); }
+	:global(.markdown strong) { font-weight: 700; }
+	:global(.markdown em) { font-style: italic; }
+
+	/* Slider */
+	input[type='range'].slider {
 		width: 100%;
-		margin-top: 8px;
-		padding: 6px;
-		background: none;
-		border: 1px solid #1d9bf0;
-		color: #1d9bf0;
-		border-radius: 6px;
-		font-size: 12px;
+		accent-color: hsl(var(--primary));
 		cursor: pointer;
 	}
 
-	.live-btn:hover {
-		background: #1d3a5c;
-	}
-
-	.rounds-list {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-	}
-
-	.round-btn {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		width: 100%;
-		padding: 8px 10px;
-		background: none;
-		border: 1px solid #2f3336;
-		border-radius: 6px;
-		color: #e7e9ea;
-		font-size: 12px;
-		cursor: pointer;
-		text-align: left;
-	}
-
-	.round-btn:hover {
-		border-color: #536471;
-	}
-
-	.round-btn.active {
-		border-color: #1d9bf0;
-		background: #1d3a5c;
-	}
-
-	.round-num {
-		font-weight: 700;
-		min-width: 24px;
-	}
-
-	.round-summary {
-		color: #71767b;
-	}
-
-	.viewing-past {
-		background: #1d3a5c;
-		color: #1d9bf0;
-		padding: 8px 20px;
-		font-size: 13px;
-		text-align: center;
-		font-weight: 600;
-	}
-
-	.sim-feed {
-		flex: 1;
-		overflow-y: auto;
-		padding: 0;
-	}
-
-	.empty {
-		padding: 40px;
-		text-align: center;
-		color: #71767b;
-		font-size: 14px;
-	}
-
-	.seed-banner {
-		margin: 12px;
-		padding: 10px 14px;
-		background: #1a2a1a;
-		border: 1px solid #2d4a2d;
-		border-radius: 8px;
-		color: #7ec87e;
-		font-size: 13px;
-	}
-
-	.seed-post {
-		border-left: 3px solid #2d4a2d;
-		opacity: 0.85;
-	}
-
-	.seed-label {
-		font-size: 11px;
-		color: #7ec87e;
-		background: #1a2a1a;
-		border: 1px solid #2d4a2d;
-		border-radius: 4px;
-		padding: 1px 6px;
-		margin-left: 8px;
-	}
-
-	.error {
-		background: #67000d;
-		color: #ff6b6b;
-		padding: 12px;
-		margin: 12px;
-		border-radius: 8px;
-		font-size: 14px;
-	}
-
-	/* --- Posts --- */
-	.post {
-		padding: 16px 20px;
-		border-bottom: 1px solid #2f3336;
-	}
-
-	.post-header {
-		display: flex;
-		align-items: baseline;
-		gap: 8px;
-		margin-bottom: 6px;
-	}
-
-	.post-header strong {
-		font-size: 14px;
-	}
-
-	.bio {
-		color: #71767b;
-		font-size: 12px;
-	}
-
-	.post-content {
-		margin: 0 0 8px;
-		font-size: 14px;
-		line-height: 1.4;
-	}
-
-	.post-footer {
-		display: flex;
-		gap: 16px;
-		align-items: center;
-	}
-
-	.likes {
-		color: #f91880;
-		font-size: 13px;
-	}
-
-	time {
-		color: #71767b;
-		font-size: 12px;
-	}
-
-	.comments {
-		margin-top: 10px;
-		padding-left: 14px;
-		border-left: 2px solid #2f3336;
-	}
-
-	.comment {
-		padding: 6px 0;
-		font-size: 13px;
-		line-height: 1.3;
-	}
-
-	.comment strong {
-		color: #e7e9ea;
-		margin-right: 6px;
-		font-size: 12px;
-	}
-
-	.comment span {
-		color: #d6d9db;
-	}
-
-	/* --- Step 4: Report layout --- */
-	.report-layout {
-		display: flex;
-		gap: 0;
-		padding: 0;
-	}
-
-	.report-sidebar {
-		width: 280px;
-		flex-shrink: 0;
-		padding: 20px;
-		border-right: 1px solid #2f3336;
-		overflow-y: auto;
-	}
-
-	.report-sidebar h3 {
-		margin: 16px 0 10px;
-		font-size: 14px;
-		color: #71767b;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-
-	.report-sidebar h3:first-child {
-		margin-top: 0;
-	}
-
-	.stance-bars {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-	}
-
-	.stance-row {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		font-size: 12px;
-	}
-
-	.stance-label {
-		width: 70px;
-		color: #71767b;
-	}
-
-	.stance-bar {
-		flex: 1;
-		height: 8px;
-		background: #2f3336;
-		border-radius: 4px;
-		overflow: hidden;
-	}
-
-	.stance-fill {
-		height: 100%;
-		border-radius: 4px;
-		transition: width 0.3s;
-	}
-
-	.stance-fill.supportive { background: #00ba7c; }
-	.stance-fill.opposing { background: #f91880; }
-	.stance-fill.neutral { background: #71767b; }
-	.stance-fill.observer { background: #1d9bf0; }
-
-	.stance-count {
-		width: 20px;
-		text-align: right;
-		color: #e7e9ea;
-		font-weight: 600;
-	}
-
-	.report-content {
-		flex: 1;
-		overflow-y: auto;
-		padding: 32px 40px;
-	}
-
-	.markdown {
-		line-height: 1.7;
-		font-size: 15px;
-	}
-
-	.markdown h2 {
-		font-size: 20px;
-		margin: 32px 0 12px;
-		padding-bottom: 8px;
-		border-bottom: 1px solid #2f3336;
-	}
-
-	.markdown h2:first-child {
-		margin-top: 0;
-	}
-
-	.markdown h3 {
-		font-size: 16px;
-		margin: 24px 0 8px;
-	}
-
-	.markdown p {
-		margin: 0 0 16px;
-	}
-
-	.markdown blockquote {
-		border-left: 3px solid #1d9bf0;
-		padding: 8px 16px;
-		margin: 12px 0;
-		background: #16181c;
-		border-radius: 0 8px 8px 0;
-		color: #d6d9db;
-		font-style: italic;
-	}
-
-	.markdown strong {
-		color: #ffffff;
-	}
-
-	/* --- Step 5: Chat layout --- */
-	.chat-layout {
-		display: flex;
-		gap: 0;
-		padding: 0;
-	}
-
-	.chat-sidebar {
-		width: 240px;
-		flex-shrink: 0;
-		padding: 16px;
-		border-right: 1px solid #2f3336;
-		overflow-y: auto;
-	}
-
-	.chat-sidebar h3 {
-		margin: 16px 0 8px;
-		font-size: 12px;
-		color: #71767b;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-
-	.chat-sidebar h3:first-child {
-		margin-top: 0;
-	}
-
-	.agent-list-chat {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-	}
-
-	.chat-target {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		width: 100%;
-		padding: 8px 10px;
-		background: none;
-		border: none;
-		border-radius: 6px;
-		color: #e7e9ea;
-		font-size: 13px;
-		cursor: pointer;
-		text-align: left;
-	}
-
-	.chat-target:hover {
-		background: #16181c;
-	}
-
-	.chat-target.active {
-		background: #1d3a5c;
-	}
-
-	.chat-target-name {
-		flex: 1;
-		font-weight: 600;
-		font-size: 12px;
-	}
-
-	.chat-target-desc {
-		font-size: 11px;
-		color: #71767b;
-	}
-
-	.chat-target-stance {
-		font-size: 10px;
-		padding: 1px 6px;
-		border-radius: 8px;
-		background: #2f3336;
-		color: #71767b;
-	}
-
-	.chat-target-stance.supportive { background: #1a3a2a; color: #00ba7c; }
-	.chat-target-stance.opposing { background: #3d1f2e; color: #f91880; }
-
-	.chat-main {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-	}
-
-	.chat-header {
-		padding: 12px 20px;
-		border-bottom: 1px solid #2f3336;
-		font-size: 14px;
-	}
-
-	.chat-messages {
-		flex: 1;
-		overflow-y: auto;
-		padding: 20px;
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-	}
-
-	.chat-msg {
-		max-width: 80%;
-	}
-
-	.chat-msg.user {
-		align-self: flex-end;
-	}
-
-	.chat-msg.assistant {
-		align-self: flex-start;
-	}
-
-	.chat-msg-label {
-		font-size: 11px;
-		color: #71767b;
-		margin-bottom: 4px;
-		font-weight: 600;
-	}
-
-	.chat-msg.user .chat-msg-label {
-		text-align: right;
-	}
-
-	.chat-msg-content {
-		padding: 10px 14px;
-		border-radius: 12px;
-		font-size: 14px;
-		line-height: 1.4;
-	}
-
-	.chat-msg.user .chat-msg-content {
-		background: #1d9bf0;
-		color: white;
-		border-bottom-right-radius: 4px;
-	}
-
-	.chat-msg.assistant .chat-msg-content {
-		background: #16181c;
-		border: 1px solid #2f3336;
-		border-bottom-left-radius: 4px;
-	}
-
-	.typing {
-		color: #71767b;
-		font-style: italic;
-	}
-
-	.chat-input-row {
-		display: flex;
-		gap: 8px;
-		padding: 12px 20px;
-		border-top: 1px solid #2f3336;
-	}
-
-	.chat-input-row input {
-		flex: 1;
-	}
-
-	/* --- Placeholder --- */
-	.placeholder {
-		max-width: 480px;
-		text-align: center;
-	}
-
-	.placeholder h2 {
-		margin: 0 0 12px;
-		font-size: 20px;
-	}
+	/* Typing animation */
+	.typing { opacity: 0.7; }
 </style>

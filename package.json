@@ -12,19 +12,25 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "^7.0.0",
+		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
 		"@types/node": "^25.5.0",
+		"autoprefixer": "^10.4.27",
 		"drizzle-kit": "^0.31.9",
+		"postcss": "^8.5.8",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.4.2",
+		"tailwindcss": "^3.4.19",
 		"typescript": "^5.9.3",
 		"vite": "^7.3.1"
 	},
 	"dependencies": {
+		"bits-ui": "^2.16.3",
+		"clsx": "^2.1.1",
 		"dotenv": "^17.3.1",
 		"drizzle-orm": "^0.45.1",
-		"postgres": "^3.4.8"
+		"postgres": "^3.4.8",
+		"tailwind-merge": "^3.5.0"
 	}
 }

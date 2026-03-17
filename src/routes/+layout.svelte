@@ -1,7 +1,14 @@
 <script lang="ts">
+	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import { themeStore } from '$lib/stores/theme';
+	import { onMount } from 'svelte';
 
 	let { children } = $props();
+
+	onMount(() => {
+		themeStore.init();
+	});
 </script>
 
 <svelte:head>
@@ -12,27 +19,6 @@
 	<title>Shanks</title>
 </svelte:head>
 
-<div class="app">
+<div class="app h-screen flex flex-col overflow-hidden">
 	{@render children()}
 </div>
-
-<style>
-	:global(*) {
-		box-sizing: border-box;
-		font-family: inherit;
-	}
-
-	:global(body) {
-		margin: 0;
-		font-family: 'Onest', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		background: #000;
-		color: #e7e9ea;
-	}
-
-	.app {
-		height: 100vh;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-	}
-</style>
