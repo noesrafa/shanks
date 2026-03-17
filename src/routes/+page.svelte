@@ -12,7 +12,7 @@
 		Bot, Send, ChevronRight, BarChart3,
 		Sparkles, BookOpen, CircleDot, Activity,
 		MessageSquare, UserCircle, Gauge, Hash,
-		RefreshCw, ExternalLink, FileBarChart
+		RefreshCw, ExternalLink, FileBarChart, LogOut
 	} from 'lucide-svelte';
 
 	// --- Types ---
@@ -573,6 +573,15 @@ The National Labor Relations Board received a surge of complaints about retaliat
 	</nav>
 	<div class="flex-1"></div>
 	<ThemeToggle />
+	<form method="POST" action="/logout" class="ml-2">
+		<button
+			type="submit"
+			class="inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors h-8 w-8 cursor-pointer"
+			title="Logout"
+		>
+			<LogOut size={16} />
+		</button>
+	</form>
 	{#if projectId}
 		<Button variant="secondary" size="sm" class="ml-2" onclick={resetState}>
 			<Plus size={13} class="rotate-45" />
