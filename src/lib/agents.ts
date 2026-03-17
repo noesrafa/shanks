@@ -134,12 +134,23 @@ export class Agent {
 	bio: string;
 	interests: string;
 	persona: string;
+	memories: string[];
 
 	constructor(profile: AgentProfile) {
 		this.name = profile.name;
 		this.bio = profile.bio;
 		this.interests = profile.interests;
 		this.persona = profile.persona || '';
+		this.memories = [];
+	}
+
+	/**
+	 * Set memories from previous rounds (MiroFish Zep-equivalent).
+	 * These are injected into the system prompt so the agent has
+	 * persistent context across simulation rounds.
+	 */
+	setMemories(memories: string[]) {
+		this.memories = memories;
 	}
 
 	/**
@@ -164,6 +175,15 @@ export class Agent {
 
 		if (this.persona) {
 			parts.push('', '# YOUR PERSONALITY AND STANCE', this.persona);
+		}
+
+		if (this.memories.length > 0) {
+			parts.push(
+				'',
+				'# YOUR MEMORY (what you did and experienced in previous rounds)',
+				...this.memories.map((m, i) => `- Round ${i + 1}: ${m}`)
+			);
+			parts.push('Use these memories to stay consistent and build on past interactions.');
 		}
 
 		parts.push(

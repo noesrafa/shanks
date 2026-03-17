@@ -123,6 +123,24 @@ export const agents = shanksSchema.table('agents', {
 	createdAt: timestamp('created_at').defaultNow().notNull()
 });
 
+// MiroFish gap P0-1: agent memory — persistent memory between simulation rounds
+// Adapted from MiroFish Zep-backed memory: simplified to DB-backed storage
+// Create with: CREATE TABLE shanks.agent_memories (id serial PRIMARY KEY, agent_id integer NOT NULL REFERENCES shanks.agents(id), project_id integer NOT NULL REFERENCES shanks.projects(id), round integer NOT NULL, memory_type text NOT NULL DEFAULT 'action_summary', content text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+// CREATE INDEX idx_agent_memories_agent_project ON shanks.agent_memories(agent_id, project_id, round);
+export const agentMemories = shanksSchema.table('agent_memories', {
+	id: serial('id').primaryKey(),
+	agentId: integer('agent_id')
+		.references(() => agents.id)
+		.notNull(),
+	projectId: integer('project_id')
+		.references(() => projects.id)
+		.notNull(),
+	round: integer('round').notNull(),
+	memoryType: text('memory_type').default('action_summary').notNull(),
+	content: text('content').notNull(),
+	createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
 // MiroFish Stage 4: persisted prediction reports, one per project (upserted on each generate)
 // Create with: CREATE TABLE shanks.reports (id serial PRIMARY KEY, project_id integer NOT NULL REFERENCES shanks.projects(id), content text NOT NULL, stats jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
 export const reports = shanksSchema.table('reports', {
