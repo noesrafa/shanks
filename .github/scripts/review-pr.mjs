@@ -9,7 +9,7 @@
  *  5. If clean → merge the PR
  *
  * Required secrets (GitHub repo settings → Secrets and variables → Actions):
- *   ANTHROPIC_API_KEY              – Claude API key
+ *   MINIMAX_API_KEY               – MiniMax Coding Plan API key
  *   PAPERCLIP_API_URL              – e.g. https://your-paperclip.com
  *   PAPERCLIP_API_KEY              – long-lived agent key for the reviewer bot
  *   PAPERCLIP_COMPANY_ID           – Paperclip company UUID
@@ -20,7 +20,7 @@
 
 const {
   GITHUB_TOKEN,
-  ANTHROPIC_API_KEY,
+  MINIMAX_API_KEY,
   PAPERCLIP_API_URL,
   PAPERCLIP_API_KEY,
   PAPERCLIP_COMPANY_ID,
@@ -55,14 +55,14 @@ async function ghFetch(path, options = {}) {
   }
 }
 
-async function claudeReview(diff) {
+async function llmReview(diff) {
   const systemPrompt = `You are a senior software engineer reviewing a pull request for "Shanks" — a prediction engine built with SvelteKit, TypeScript, Supabase (Drizzle ORM), and LLM agents.
 
 Review the diff and return a JSON object with exactly this shape:
 {
-  "approved": boolean,           // true = no blocking issues, false = needs fixes
-  "summary": string,             // 1-2 sentence overall assessment
-  "issues": [                    // empty array if approved
+  "approved": boolean,
+  "summary": string,
+  "issues": [
     {
       "severity": "error" | "warning",
       "file": string,
@@ -79,18 +79,17 @@ Guidelines:
 - Be concise — one focused issue per item.
 - If the diff is trivial or clean, set approved=true and issues=[].`;
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('https://codingplan.minimaxi.chat/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
+      'Authorization': `Bearer ${MINIMAX_API_KEY}`,
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: 'MiniMax-M1',
       max_tokens: 2048,
-      system: systemPrompt,
       messages: [
+        { role: 'system', content: systemPrompt },
         {
           role: 'user',
           content: `Here is the pull request diff to review:\n\n\`\`\`diff\n${diff}\n\`\`\`\n\nReturn only the JSON object, no markdown wrapping.`,
@@ -101,12 +100,11 @@ Guidelines:
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Claude API error ${res.status}: ${err}`);
+    throw new Error(`MiniMax API error ${res.status}: ${err}`);
   }
 
   const data = await res.json();
-  const raw = data.content[0].text.trim();
-  // Strip accidental markdown code fences
+  const raw = data.choices[0].message.content.trim();
   const json = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
   return JSON.parse(json);
 }
@@ -199,10 +197,10 @@ async function main() {
     : diff;
 
   // 2. Claude review
-  console.log('Sending diff to Claude for review…');
+  console.log('Sending diff to MiniMax for review…');
   let review;
   try {
-    review = await claudeReview(truncated);
+    review = await llmReview(truncated);
   } catch (err) {
     console.error('Claude review failed:', err.message);
     await postGitHubReview(
