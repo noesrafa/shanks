@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
-import { projects, graphNodes, graphEdges, agents, users, posts, comments, follows } from '$lib/server/schema';
+import { projects, graphNodes, graphEdges, agents, users, posts, comments, follows, reports } from '$lib/server/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 
 /**
@@ -109,6 +109,19 @@ export const GET: RequestHandler = async ({ params }) => {
 			follows: (projectFollows as any[])[0]?.count ?? 0
 		};
 
+		// Restore persisted report if it exists
+		let savedReport: { content: string; stats: unknown } | null = null;
+		try {
+			const reportRow = await db.query.reports.findFirst({
+				where: (r, { eq }) => eq(r.projectId, projectId)
+			});
+			if (reportRow) {
+				savedReport = { content: reportRow.content, stats: reportRow.stats };
+			}
+		} catch {
+			// Table may not exist yet — skip silently
+		}
+
 		return json({
 			project: {
 				id: project.id,
@@ -122,7 +135,8 @@ export const GET: RequestHandler = async ({ params }) => {
 			edges,
 			agents: projectAgents,
 			posts: postsWithComments,
-			stats
+			stats,
+			report: savedReport
 		});
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unknown error';

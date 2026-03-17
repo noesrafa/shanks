@@ -478,8 +478,14 @@ The National Labor Relations Board received a surge of complaints about retaliat
 				currentStep = 1;
 			}
 
-			// Report is not stored in DB, but stats tell us if simulation ran
-			// User can re-generate report from step 4
+			// Restore report from DB if it was previously generated
+			if (data.report) {
+				report = data.report.content;
+				reportStats = data.report.stats;
+				if (generatedAgents.length > 0) {
+					currentStep = 4; // report exists — jump to report step
+				}
+			}
 		} catch (e) {
 			initialError = e instanceof Error ? e.message : 'Failed to load project';
 		} finally {
@@ -739,11 +745,17 @@ The National Labor Relations Board received a surge of complaints about retaliat
 			<div class="sim-sidebar">
 				<h3>Controls</h3>
 				{#if !seeded && totalRounds === 0}
-					<button class="secondary full-width" onclick={generateSeedPosts} disabled={seedLoading || !projectId}>
+					<button
+						class="secondary full-width"
+						onclick={generateSeedPosts}
+						disabled={seedLoading || !projectId}
+						title="Generate initial posts from agent personas to kick off the conversation"
+					>
 						{seedLoading ? 'Seeding...' : 'Seed posts'}
 					</button>
 				{/if}
-				<button class="primary full-width" onclick={simulate} disabled={loading || !projectId}>
+
+				<button class="primary full-width" onclick={simulate} disabled={loading || !projectId} style="margin-top: 0.5rem;">
 					{loading ? 'Running...' : `Run round ${totalRounds + 1}`}
 				</button>
 

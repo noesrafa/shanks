@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
-import { projects, users, posts, comments, follows, agents, graphNodes } from '$lib/server/schema';
+import { projects, users, posts, comments, follows, agents, graphNodes, reports } from '$lib/server/schema';
 import { MINIMAX_API_KEY } from '$env/static/private';
 import { eq, desc, sql } from 'drizzle-orm';
 
@@ -187,16 +187,24 @@ Based on this simulation data, write the prediction report. Focus on:
 			.replace(/<think>[\s\S]*?<\/think>/g, '')
 			.trim();
 
-		return json({
-			report,
-			stats: {
-				agents: agentList.length,
-				posts: allPosts.length,
-				comments: allComments.length,
-				follows: followRows.length,
-				stances: stanceCounts
-			}
-		});
+		const stats = {
+			agents: agentList.length,
+			posts: allPosts.length,
+			comments: allComments.length,
+			follows: followRows.length,
+			stances: stanceCounts
+		};
+
+		// Persist report to DB (upsert: delete old + insert new for this project)
+		// Table must exist: see schema.ts comment for CREATE TABLE SQL
+		try {
+			await db.delete(reports).where(eq(reports.projectId, projectId));
+			await db.insert(reports).values({ projectId, content: report, stats });
+		} catch {
+			// Non-fatal: if table doesn't exist yet, skip persistence silently
+		}
+
+		return json({ report, stats });
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Unknown error';
 		return json({ error: message }, { status: 500 });

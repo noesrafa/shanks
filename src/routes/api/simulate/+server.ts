@@ -94,6 +94,11 @@ async function buildFeedForUser(userId: number): Promise<FeedPost[]> {
 /**
  * Load agents for simulation. If projectId given, use generated agents.
  * Otherwise fall back to demo profiles.
+ *
+ * Activity-level selection (adapted from OASIS):
+ * Each round, agents are selected probabilistically based on their activity_level.
+ * High-activity agents (0.9) almost always act; low-activity ones (0.1) rarely do.
+ * At least 1 agent is guaranteed to act per round.
  */
 async function loadAgents(projectId?: number): Promise<{ agent: Agent; userId: number; name: string; bio: string }[]> {
 	if (projectId) {
@@ -111,7 +116,7 @@ async function loadAgents(projectId?: number): Promise<{ agent: Agent; userId: n
 			.innerJoin(users, eq(agents.userId, users.id))
 			.where(eq(agents.projectId, projectId));
 
-		return projectAgents.map((a) => ({
+		const all = projectAgents.map((a) => ({
 			agent: new Agent({
 				name: a.name,
 				bio: a.bio,
@@ -120,8 +125,19 @@ async function loadAgents(projectId?: number): Promise<{ agent: Agent; userId: n
 			}),
 			userId: a.userId,
 			name: a.name,
-			bio: a.bio
+			bio: a.bio,
+			activityLevel: a.activityLevel
 		}));
+
+		// Filter by activity_level probability — not all agents act every round
+		const active = all.filter((a) => Math.random() < a.activityLevel);
+		// Guarantee at least 1 agent acts
+		if (active.length === 0 && all.length > 0) {
+			const pick = all[Math.floor(Math.random() * all.length)];
+			active.push(pick);
+		}
+
+		return active;
 	}
 
 	// Demo mode: hardcoded agents

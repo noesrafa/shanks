@@ -122,3 +122,16 @@ export const agents = shanksSchema.table('agents', {
 	activityLevel: real('activity_level').default(0.5).notNull(),
 	createdAt: timestamp('created_at').defaultNow().notNull()
 });
+
+// MiroFish Stage 4: persisted prediction reports, one per project (upserted on each generate)
+// Create with: CREATE TABLE shanks.reports (id serial PRIMARY KEY, project_id integer NOT NULL REFERENCES shanks.projects(id), content text NOT NULL, stats jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
+export const reports = shanksSchema.table('reports', {
+	id: serial('id').primaryKey(),
+	projectId: integer('project_id')
+		.references(() => projects.id)
+		.notNull(),
+	content: text('content').notNull(),
+	stats: jsonb('stats').default({}).notNull(),
+	createdAt: timestamp('created_at').defaultNow().notNull(),
+	updatedAt: timestamp('updated_at').defaultNow().notNull()
+});
