@@ -30,7 +30,8 @@ No inventes mecánicas que no existan en OASIS o MiroFish sin preguntar primero.
 - Haz commits atómicos y descriptivos
 - SIEMPRE verifica que el build funcione (`npm run build`) antes de considerar el trabajo terminado
 - NUNCA pushes directo a main — siempre crea una branch descriptiva (ej: `feat/add-predictions-page`)
-- Crea un merge request (MR) a main y mergea si no hay comentarios
+- Crea un PR a main usando `gh pr create` cuando termines
+- NUNCA mergees tú mismo — asigna el issue al MR Reviewer para que revise y mergee
 
 ## Principios
 - Fiel a OASIS + MiroFish: adaptar, no inventar

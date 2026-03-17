@@ -2,9 +2,9 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { Agent, type FeedPost } from '$lib/agents';
 import { db } from '$lib/server/db';
-import { users, posts, likes, comments, follows, agents } from '$lib/server/schema';
+import { users, posts, likes, comments, follows, agents, agentMemories } from '$lib/server/schema';
 import { MINIMAX_API_KEY } from '$env/static/private';
-import { desc, eq, sql, inArray } from 'drizzle-orm';
+import { desc, eq, sql, inArray, and, asc } from 'drizzle-orm';
 
 /**
  * Simulation endpoint adapted from OASIS's simulation loop.
@@ -100,11 +100,12 @@ async function buildFeedForUser(userId: number): Promise<FeedPost[]> {
  * High-activity agents (0.9) almost always act; low-activity ones (0.1) rarely do.
  * At least 1 agent is guaranteed to act per round.
  */
-async function loadAgents(projectId?: number): Promise<{ agent: Agent; userId: number; name: string; bio: string }[]> {
+async function loadAgents(projectId?: number): Promise<{ agent: Agent; userId: number; agentId: number | null; name: string; bio: string }[]> {
 	if (projectId) {
 		// Project mode: use agents from knowledge graph
 		const projectAgents = await db
 			.select({
+				agentId: agents.id,
 				userId: agents.userId,
 				name: users.name,
 				bio: users.bio,
@@ -116,18 +117,45 @@ async function loadAgents(projectId?: number): Promise<{ agent: Agent; userId: n
 			.innerJoin(users, eq(agents.userId, users.id))
 			.where(eq(agents.projectId, projectId));
 
-		const all = projectAgents.map((a) => ({
-			agent: new Agent({
+		// Load memories for all agents in this project
+		const memories = await db
+			.select({
+				agentId: agentMemories.agentId,
+				round: agentMemories.round,
+				content: agentMemories.content
+			})
+			.from(agentMemories)
+			.where(eq(agentMemories.projectId, projectId))
+			.orderBy(asc(agentMemories.round));
+
+		// Group memories by agent
+		const memsByAgent = new Map<number, string[]>();
+		for (const m of memories) {
+			if (!memsByAgent.has(m.agentId)) memsByAgent.set(m.agentId, []);
+			memsByAgent.get(m.agentId)!.push(m.content);
+		}
+
+		const all = projectAgents.map((a) => {
+			const agent = new Agent({
 				name: a.name,
 				bio: a.bio,
 				interests: a.interests,
 				persona: a.persona
-			}),
-			userId: a.userId,
-			name: a.name,
-			bio: a.bio,
-			activityLevel: a.activityLevel
-		}));
+			});
+			// Inject past memories into agent
+			const agentMems = memsByAgent.get(a.agentId) || [];
+			if (agentMems.length > 0) {
+				agent.setMemories(agentMems);
+			}
+			return {
+				agent,
+				userId: a.userId,
+				agentId: a.agentId as number | null,
+				name: a.name,
+				bio: a.bio,
+				activityLevel: a.activityLevel
+			};
+		});
 
 		// Filter by activity_level probability — not all agents act every round
 		const active = all.filter((a) => Math.random() < a.activityLevel);
@@ -155,6 +183,7 @@ async function loadAgents(projectId?: number): Promise<{ agent: Agent; userId: n
 			return {
 				agent: new Agent(profile),
 				userId: user.id,
+				agentId: null as number | null,
 				name: profile.name,
 				bio: profile.bio
 			};
@@ -167,6 +196,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json().catch(() => ({}));
 		const projectId = body.projectId as number | undefined;
+		const round = (body.round as number | undefined) ?? 1;
 
 		const agentList = await loadAgents(projectId);
 
@@ -176,7 +206,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// Each agent: get personalized feed → decide action → execute
 		const results = await Promise.allSettled(
-			agentList.map(async ({ agent, userId, name, bio }) => {
+			agentList.map(async ({ agent, userId, agentId, name, bio }) => {
 				const feed = await buildFeedForUser(userId);
 				const action = await agent.decideAction(MINIMAX_API_KEY, feed);
 
@@ -186,9 +216,10 @@ export const POST: RequestHandler = async ({ request }) => {
 							.insert(posts)
 							.values({ userId, content: action.content })
 							.returning();
-						if (!post) return { agent: name, action: 'do_nothing' as const };
+						if (!post) return { agent: name, agentId, action: 'do_nothing' as const };
 						return {
 							agent: name,
+							agentId,
 							action: 'create_post' as const,
 							post: { ...post, userName: name, userBio: bio }
 						};
@@ -200,9 +231,9 @@ export const POST: RequestHandler = async ({ request }) => {
 								.update(posts)
 								.set({ numLikes: sql`${posts.numLikes} + 1` })
 								.where(eq(posts.id, action.post_id));
-							return { agent: name, action: 'like_post' as const, postId: action.post_id };
+							return { agent: name, agentId, action: 'like_post' as const, postId: action.post_id };
 						} catch {
-							return { agent: name, action: 'do_nothing' as const };
+							return { agent: name, agentId, action: 'do_nothing' as const };
 						}
 					}
 					case 'create_comment': {
@@ -211,15 +242,16 @@ export const POST: RequestHandler = async ({ request }) => {
 								.insert(comments)
 								.values({ postId: action.post_id, userId, content: action.content })
 								.returning();
-							if (!comment) return { agent: name, action: 'do_nothing' as const };
+							if (!comment) return { agent: name, agentId, action: 'do_nothing' as const };
 							return {
 								agent: name,
+								agentId,
 								action: 'create_comment' as const,
 								postId: action.post_id,
 								comment: comment.content
 							};
 						} catch {
-							return { agent: name, action: 'do_nothing' as const };
+							return { agent: name, agentId, action: 'do_nothing' as const };
 						}
 					}
 					case 'follow': {
@@ -228,16 +260,16 @@ export const POST: RequestHandler = async ({ request }) => {
 								where: (u, { eq }) => eq(u.name, action.user_name)
 							});
 							if (!target || target.id === userId) {
-								return { agent: name, action: 'do_nothing' as const };
+								return { agent: name, agentId, action: 'do_nothing' as const };
 							}
 							await db.insert(follows).values({ followerId: userId, followeeId: target.id });
-							return { agent: name, action: 'follow' as const, target: action.user_name };
+							return { agent: name, agentId, action: 'follow' as const, target: action.user_name };
 						} catch {
-							return { agent: name, action: 'do_nothing' as const };
+							return { agent: name, agentId, action: 'do_nothing' as const };
 						}
 					}
 					default:
-						return { agent: name, action: 'do_nothing' as const };
+						return { agent: name, agentId, action: 'do_nothing' as const };
 				}
 			})
 		);
@@ -245,6 +277,42 @@ export const POST: RequestHandler = async ({ request }) => {
 		const actions = results
 			.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
 			.map((r) => r.value);
+
+		// Save memories for each agent that acted (project mode only)
+		if (projectId) {
+			const memoryInserts = actions
+				.filter((a: { agentId?: number | null }) => a.agentId != null)
+				.map((a: { agentId: number; agent: string; action: string; post?: { content: string }; comment?: string; postId?: number; target?: string }) => {
+					let summary: string;
+					switch (a.action) {
+						case 'create_post':
+							summary = `Posted: "${a.post?.content ?? '(unknown)'}"`;
+							break;
+						case 'like_post':
+							summary = `Liked post #${a.postId}`;
+							break;
+						case 'create_comment':
+							summary = `Commented on post #${a.postId}: "${a.comment ?? ''}"`;
+							break;
+						case 'follow':
+							summary = `Followed ${a.target}`;
+							break;
+						default:
+							summary = 'Did nothing';
+					}
+					return {
+						agentId: a.agentId,
+						projectId,
+						round,
+						memoryType: 'action_summary' as const,
+						content: summary
+					};
+				});
+
+			if (memoryInserts.length > 0) {
+				await db.insert(agentMemories).values(memoryInserts);
+			}
+		}
 
 		// Return full feed
 		const allPosts = await db
