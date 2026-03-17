@@ -135,12 +135,17 @@ The National Labor Relations Board received a surge of complaints about retaliat
 	let generatedAgents: GeneratedAgent[] = $state([]);
 	let agentsLoading = $state(false);
 	let agentsError = $state('');
+	let agentsProgress = $state('');
 
 	// Step 4: report
 	let report = $state('');
 	let reportStats: any = $state(null);
 	let reportLoading = $state(false);
 	let reportError = $state('');
+
+	// Loading from URL
+	let initialLoading = $state(false);
+	let initialError = $state('');
 
 	async function generateReport() {
 		reportLoading = true;
@@ -177,12 +182,22 @@ The National Labor Relations Board received a surge of complaints about retaliat
 	let chatHistory: ChatMessage[] = $state([]);
 	let chatLoading = $state(false);
 
+	let chatMessagesEl: HTMLDivElement | undefined = $state();
+
+	async function scrollChatToBottom() {
+		await tick();
+		if (chatMessagesEl) {
+			chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+		}
+	}
+
 	async function sendChat() {
 		if (!chatInput.trim() || chatLoading) return;
 		const msg = chatInput.trim();
 		chatInput = '';
 		chatHistory = [...chatHistory, { role: 'user', content: msg }];
 		chatLoading = true;
+		scrollChatToBottom();
 
 		try {
 			const res = await fetch('/api/chat', {
@@ -203,6 +218,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 			} else {
 				chatHistory = [...chatHistory, { role: 'assistant', content: data.reply }];
 			}
+			scrollChatToBottom();
 		} catch {
 			chatHistory = [...chatHistory, { role: 'assistant', content: 'Failed to get response.' }];
 		} finally {
@@ -228,6 +244,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 	async function generateAgents() {
 		agentsLoading = true;
 		agentsError = '';
+		agentsProgress = `Generating personas for ${graphNodes.length} entities...`;
 		try {
 			const res = await fetch('/api/agents', {
 				method: 'POST',
@@ -244,6 +261,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 			agentsError = e instanceof Error ? e.message : 'Failed to generate agents';
 		} finally {
 			agentsLoading = false;
+			agentsProgress = '';
 		}
 	}
 
@@ -287,6 +305,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 			}
 			projectId = data.projectId;
 			ontology = data.ontology;
+			setUrlParam(projectId);
 
 			// Fetch full graph
 			const graphRes = await fetch(`/api/graph?projectId=${projectId}`);
@@ -352,78 +371,132 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		return `${a.agent} idle`;
 	}
 
-	// --- Persist state to localStorage ---
-	const STORAGE_KEY = 'shanks_state';
+	// --- URL-based persistence ---
+	import { onMount, tick } from 'svelte';
 
-	interface SavedState {
-		currentStep: number;
-		seedText: string;
-		requirement: string;
-		projectId: number;
-		graphNodes: GraphNode[];
-		graphEdges: GraphEdge[];
-		ontology: any;
-		generatedAgents: GeneratedAgent[];
-		snapshots: RoundSnapshot[];
-		totalRounds: number;
-		viewingRound: number;
-		report: string;
-		reportStats: any;
+	function setUrlParam(pid: number) {
+		const url = new URL(window.location.href);
+		if (pid) {
+			url.searchParams.set('project', String(pid));
+		} else {
+			url.searchParams.delete('project');
+		}
+		window.history.replaceState({}, '', url.toString());
 	}
 
-	function saveState() {
+	function getUrlProjectId(): number {
+		const url = new URL(window.location.href);
+		return parseInt(url.searchParams.get('project') || '0') || 0;
+	}
+
+	async function loadProject(pid: number) {
+		initialLoading = true;
+		initialError = '';
 		try {
-			const state: SavedState = {
-				currentStep,
-				seedText,
-				requirement,
-				projectId,
-				graphNodes,
-				graphEdges,
-				ontology,
-				generatedAgents,
-				snapshots,
-				totalRounds,
-				viewingRound,
-				report,
-				reportStats
-			};
-			localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-		} catch {}
+			const res = await fetch(`/api/project/${pid}`);
+			const data = await res.json();
+			if (data.error) {
+				initialError = data.error;
+				return;
+			}
+
+			// Restore project state
+			projectId = data.project.id;
+			seedText = data.project.seedText;
+			requirement = data.project.requirement;
+			ontology = data.project.ontology;
+
+			// Graph
+			graphNodes = data.nodes.map((n: any) => ({
+				id: n.id,
+				name: n.name,
+				entityType: n.entity_type ?? n.entityType,
+				summary: n.summary,
+				attributes: n.attributes
+			}));
+			graphEdges = data.edges.map((e: any) => ({
+				id: e.id,
+				sourceNodeId: e.source_node_id ?? e.sourceNodeId,
+				targetNodeId: e.target_node_id ?? e.targetNodeId,
+				edgeType: e.edge_type ?? e.edgeType,
+				fact: e.fact
+			}));
+
+			// Agents
+			generatedAgents = (data.agents || []).map((a: any) => ({
+				id: a.id,
+				userId: a.userId,
+				name: a.name,
+				entityType: a.entityType,
+				bio: a.bio,
+				persona: a.persona,
+				interests: typeof a.interests === 'string'
+					? a.interests.split(',').map((s: string) => s.trim())
+					: a.interests,
+				stance: a.stance,
+				activityLevel: a.activityLevel
+			}));
+
+			// Determine currentStep based on available data
+			if (generatedAgents.length > 0) {
+				// Check if there are posts (simulation ran)
+				if (data.posts && data.posts.length > 0) {
+					currentStep = 3; // simulation has data
+				} else {
+					currentStep = 3; // agents exist, ready to simulate
+				}
+			} else if (graphNodes.length > 0) {
+				currentStep = 2; // graph exists, ready for agents
+			} else {
+				currentStep = 1;
+			}
+
+			// Report is not stored in DB, but stats tell us if simulation ran
+			// User can re-generate report from step 4
+		} catch (e) {
+			initialError = e instanceof Error ? e.message : 'Failed to load project';
+		} finally {
+			initialLoading = false;
+		}
 	}
 
-	function loadState() {
-		try {
-			const raw = localStorage.getItem(STORAGE_KEY);
-			if (!raw) return;
-			const state: SavedState = JSON.parse(raw);
-			currentStep = state.currentStep ?? 1;
-			seedText = state.seedText ?? '';
-			requirement = state.requirement ?? '';
-			projectId = state.projectId ?? 0;
-			graphNodes = state.graphNodes ?? [];
-			graphEdges = state.graphEdges ?? [];
-			ontology = state.ontology ?? null;
-			generatedAgents = state.generatedAgents ?? [];
-			snapshots = state.snapshots ?? [];
-			totalRounds = state.totalRounds ?? 0;
-			viewingRound = state.viewingRound ?? 0;
-			report = state.report ?? '';
-			reportStats = state.reportStats ?? null;
-		} catch {}
+	function resetState() {
+		currentStep = 1;
+		seedText = '';
+		requirement = '';
+		projectId = 0;
+		graphNodes = [];
+		graphEdges = [];
+		ontology = null;
+		generatedAgents = [];
+		snapshots = [];
+		totalRounds = 0;
+		viewingRound = 0;
+		report = '';
+		reportStats = null;
+		chatHistory = [];
+		chatInput = '';
+		chatMode = 'report';
+		chatAgent = '';
+		initialError = '';
+		setUrlParam(0);
 	}
 
-	// Auto-save on every state change
-	$effect(() => {
-		// Touch all reactive state to track dependencies
-		void [currentStep, seedText, requirement, projectId, graphNodes, graphEdges,
-			ontology, generatedAgents, snapshots, totalRounds, viewingRound, report, reportStats];
-		saveState();
+	// Determine which steps have data
+	let stepHasData = $derived({
+		1: graphNodes.length > 0,
+		2: generatedAgents.length > 0,
+		3: snapshots.length > 0 || totalRounds > 0,
+		4: !!report,
+		5: chatHistory.length > 0
+	} as Record<number, boolean>);
+
+	onMount(async () => {
+		const pid = getUrlProjectId();
+		if (pid) {
+			await loadProject(pid);
+		}
 	});
-
-	// Load on mount (browser only)
-	import { onMount } from 'svelte';
-	onMount(() => loadState());
 </script>
 
 <!-- Top bar -->
@@ -434,7 +507,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 			<button
 				class="step"
 				class:active={currentStep === step.num}
-				class:done={currentStep > step.num}
+				class:done={stepHasData[step.num]}
 				onclick={() => (currentStep = step.num)}
 			>
 				<span class="step-num">{step.num}</span>
@@ -443,11 +516,23 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		{/each}
 	</nav>
 	<div class="spacer"></div>
+	{#if projectId}
+		<button class="new-project-btn" onclick={resetState}>New Project</button>
+	{/if}
 </header>
 
 <!-- Main content -->
 <main class="content">
-	{#if currentStep === 1}
+	{#if initialLoading}
+		<div class="step-panel" style="display:flex;align-items:center;justify-content:center;">
+			<div class="empty">Loading project...</div>
+		</div>
+	{:else if initialError}
+		<div class="step-panel" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+			<div class="error" style="margin:0;">{initialError}</div>
+			<button class="primary" onclick={resetState}>Start Fresh</button>
+		</div>
+	{:else if currentStep === 1}
 		<!-- STEP 1: Seed material + Knowledge Graph -->
 		<div class="step-panel graph-layout">
 			<div class="seed-side">
@@ -585,8 +670,8 @@ The National Labor Relations Board received a surge of complaints about retaliat
 					<div class="empty">Build a knowledge graph in Step 1 first.</div>
 				{:else}
 					<p class="hint">Generate agent personas from the {graphNodes.length} entities extracted in Step 1. Each entity becomes an agent with personality, stance, and behavior.</p>
-					<button class="primary" onclick={generateAgents} disabled={agentsLoading}>
-						{agentsLoading ? 'Generating personas...' : `Generate ${graphNodes.length} Agents`}
+					<button class="primary" onclick={generateAgents} disabled={agentsLoading || !projectId}>
+						{agentsLoading ? (agentsProgress || 'Generating...') : `Generate ${graphNodes.length} Agents`}
 					</button>
 				{/if}
 			{:else}
@@ -624,7 +709,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 		<div class="step-panel sim-layout">
 			<div class="sim-sidebar">
 				<h3>Controls</h3>
-				<button class="primary full-width" onclick={simulate} disabled={loading}>
+				<button class="primary full-width" onclick={simulate} disabled={loading || !projectId}>
 					{loading ? 'Running...' : `Run round ${totalRounds + 1}`}
 				</button>
 
@@ -868,7 +953,7 @@ The National Labor Relations Board received a surge of complaints about retaliat
 					{/if}
 				</div>
 
-				<div class="chat-messages">
+				<div class="chat-messages" bind:this={chatMessagesEl}>
 					{#if chatHistory.length === 0}
 						<div class="empty">
 							{#if chatMode === 'report'}
@@ -968,6 +1053,22 @@ The National Labor Relations Board received a surge of complaints about retaliat
 
 	.spacer {
 		flex: 1;
+	}
+
+	.new-project-btn {
+		background: none;
+		border: 1px solid #2f3336;
+		color: #e7e9ea;
+		padding: 6px 14px;
+		border-radius: 6px;
+		font-size: 13px;
+		cursor: pointer;
+		font-weight: 600;
+	}
+
+	.new-project-btn:hover {
+		border-color: #f91880;
+		color: #f91880;
 	}
 
 	/* --- Main content --- */

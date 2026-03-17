@@ -49,7 +49,7 @@ async function callLLM(system: string, user: string): Promise<string> {
 				{ role: 'user', content: user }
 			],
 			temperature: 0.3,
-			max_tokens: 4096
+			max_tokens: 8192
 		})
 	});
 
@@ -67,12 +67,26 @@ async function callLLM(system: string, user: string): Promise<string> {
 
 function parseJSON<T>(text: string): T {
 	// Extract JSON from possible markdown fences
-	const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-	const jsonStr = match ? match[1].trim() : text.trim();
+	const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+	let jsonStr = fenceMatch ? fenceMatch[1].trim() : text.trim();
+
+	// If not from fence, extract outermost JSON object
+	if (!fenceMatch) {
+		const objStart = jsonStr.indexOf('{');
+		const objEnd = jsonStr.lastIndexOf('}');
+		if (objStart !== -1 && objEnd > objStart) {
+			jsonStr = jsonStr.slice(objStart, objEnd + 1);
+		}
+	}
+
 	try {
 		return JSON.parse(jsonStr);
 	} catch {
-		throw new Error(`Failed to parse LLM JSON response: ${jsonStr.slice(0, 200)}`);
+		// Clean up common LLM JSON issues: control chars, trailing commas
+		const cleaned = jsonStr
+			.replace(/[\x00-\x1f\x7f]/g, (ch) => ch === '\n' || ch === '\t' ? ch : ' ')
+			.replace(/,\s*([}\]])/g, '$1');
+		return JSON.parse(cleaned);
 	}
 }
 
